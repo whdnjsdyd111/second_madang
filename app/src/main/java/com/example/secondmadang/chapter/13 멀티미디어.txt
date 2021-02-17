@@ -1,0 +1,1004 @@
+            13-1 카메라로 사진 찍어 저장하기
+
+멀티미디어 기능에서 기본은 카메라 기능이다.
+카메라는 단순히 찍는 용도가 아닌 화면에 여러 정보를 더 표시하건 영상 또는 이미지를 다른 기능에 활용되기도 한다.
+예로 카메라로 바코드를 찍는 바코드 리더기나 쿠폰 정보를 함께 보여주는 증강 현실 앱 등이 있다.
+
+카메라로 사진 찍기 위한 방법은 크게 두 가지로 있다.
+
+
+    1   인텐트로 단말의 카메라 앱을 실행한 후 결과 사진을 받아 처리
+    2   앱 화면에 카메라 미리보기를 보여주고 직접 사진 찍어 처리
+
+
+스마트폰 단말에 카메라 앱이 미리 설치되어 이를 이용하여 간단히 구현할 수 있다.
+단말의 카메라 앱은 다른 개발자가 미리 만들어 설치해둔 것이기 때문에 인텐트로 요청하면 된다.
+
+이제 sample_capture.xml 을 만들어 [사진 찍기] 버튼을 추가하고 중간에 이미지를 둔다.
+그리고 메인 액티비티에서 코드를 작성해보자.
+
+
+    public class CaptureActivity extends AppCompatActivity {
+        ImageView imageView;
+        File file;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_capture);
+
+            imageView = findViewById(R.id.imageView13);
+
+            Button button = findViewById(R.id.button111);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    takePicture();
+                }
+            });
+        }
+
+        public void takePicture() {
+            if (file == null) {
+                file = createFile();
+            }
+
+            Uri fileUri = FileProvider.getUriForFile(this, "com.example.secondmadang.intent.fileprovider", file);
+            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, fileUri);
+            if (intent.resolveActivity(getPackageManager()) != null) {
+                startActivityForResult(intent, 101);
+            }
+        }
+
+        private File createFile() {
+            String filename = "capture.jpg";
+
+            File storageDir = Environment.getExternalStorageDirectory();
+            File outFile = new File(storageDir, filename);
+
+            return outFile;
+        }
+    }
+
+
+버튼 클릭시 takePicture() 메소드를 호출하여 카메라 앱으로 사진을 찍은 후 그 결과물을 저장한다.
+파일을 만드는 코드는 createFile() 메소드로 분리했고 capture.jpg 이름으로 SD 카드에 파일을 만든다.
+근데 이렇게 만든 파일은 카메라 앱이 사용하 땐 다른 앱에서 파일을 공유해야 하니 내용 제공자를 만들어
+해당 폴더를 공유할 수 있어야 한다.
+
+먼저 'app/res' 폴더 안에 xml 폴더를 먼저 만들고 external.xml 파일을 추가한다.
+파일안의 <paths> 태그를 다음과 같이 작성한다.
+
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <paths xmlns:android="http://schemas.android.com/apk/res/android">
+        <external-path name="sdcard" path="." />
+    </paths>
+
+
+그 다음 매니페스트 파일에서 <provider> 태그로 내용 제공자를 추가한다.
+
+
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="com.example.secondmadang.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+            android:name="android.support.FILE_PROVIDER_PATHS"
+            android:resource="@xml/external" />
+    </provider>
+
+
+<provider> 태그에 name 속성이 들어있고 androidx.core.content.FileProvider 클래스를 지정한다.
+이것은 FileProvider 로 특정 폴더를 공유하는 데 사용하는 내용 제공자이다.
+authorities 속성에 설정한 값은 이 앱의 패키지 이름과 .fileprovider 글자를 붙여 넣었다.
+<meta-data> 태그에 name 과 resource 속성이 들어가며 resource 에 external.xml 파일을 지정한다.
+
+이렇게 추가한 내용 제공자를 사용해 찍은 사진을 저장할 파일 위치를 지정한 코드 부분을 이해할 수 있다.
+
+
+    Uri fileUri = FileProvider.getUriForFile(this, "com.example.secondmadang.fileprovider", file);
+    Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+    intent.putExtra(MediaStore.EXTRA_OUTPUT, fileUri);
+
+
+FileProvider.getUriForFile() 메소드를 사용하면 카메라 앱에서 공유하여 사용할 수 있는 파일 정보를
+Uri 객체로 만들 수 있다. Uri 객체는 MediaStore.EXTRA_OUTPUT 키를 사용해 인텐트에 부가 데이터로 추가된다.
+
+인텐트 객체를 만들었다면 startActivityForResult() 메소드로 시스템으로 인텐트 객체를 전달한다.
+안말의 카메라 앱을 띄워라는 액션 정보는 MediaStore.ACTION_IMAGE_CAPTURE 이다.
+resolveActivity() 메소드는 인텐트에서 지정한 액티비티가 있는지 확인할 때 사용한다.
+인텐트 객체를 만들어 카메라 앱을 실행한 후 사진을 찍고 나면 카메라 앱의 액티비티를 닫게 되는데
+그 때 응답받는 부분이 onActivityResult() 메소드다. 메인 액티비티에 추가하자.
+
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == 101 && resultCode == RESULT_OK) {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = 8;
+            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+
+            imageView.setImageBitmap(bitmap);
+        }
+    }
+
+
+onActivityResult() 메소드가 호출되면 카메라 앱에서 찍은 사진을 파일에서 확인할 수 있다.
+파일은 capture.jpg 라는 이름으로 지정했으니 이 파일을 읽어 들여 이미지뷰에 설정한다.
+
+카메라 앱을 띄우려면 <uses-feature> 와 <uses-permission> 태그를 추가한다.
+
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-feature android:name="android.hardware.camera2" android:required="true" />
+
+
+<uses-feature> 태그로 단말의 하드웨어 카메라가 반드시 있어야 앱이 실행될 수 있다는 것을 지정한다.
+위험 권한이기 때문에 이를 위한 설정과 코드를 추가한다.
+먼저 그래들에서 자동으로 위험 권한을 부여하기 위한 외부 라이브러리를 추가한다.
+
+
+    implementation 'com.github.pedroSG94:AutoPermissions:1.0.3'
+
+
+    public class CaptureActivity extends AppCompatActivity implements AutoPermissionsListener {
+        ...
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            ...
+
+            AutoPermissions.Companion.loadAllPermissions(this, 101);
+        }
+
+        @Override
+        public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+            AutoPermissions.Companion.parsePermissions(this, requestCode, permissions, this);
+        }
+
+        @Override
+        public void onDenied(int i, String[] permissions) {
+            Toast.makeText(this, "permissions denied : " + permissions.length, Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        public void onGranted(int i, String[] permissions) {
+            Toast.makeText(this, "permissions granted : " + permissions.length, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+            13-2 화면에 카메라 미리보기 넣기
+
+인텐트와 startActivityForResult() 메소드로 사진 찍는 방법은 복잡하지 않다.
+단말의 카메라 앱이 기본적으로 제공하는 기능이기 때문에 그대로 사용하면 된다.
+이는 카메라를 단순히 찍는 것이 아닌 증강현실로 표현할 아이콘이나 증강현실 등의 그래픽은
+서피스뷰(SurfaceView) 라는 것으로 구현하면 된다.
+
+
+                                                            프리뷰 설정
+                                                                -->
+    서피스뷰    <--         TYPE SURFACE_TYPE_PUSH_BUFFERS                  카메라     <-- 프리뷰 시작
+             4.프리뷰 표시       서비스 홀더                     <--
+                                                            프리뷰 디스플래이
+
+
+카메라 미리보기 기능을 구현하려면 일반 뷰가 아닌 서피스뷰를 사용해야 한다.
+이는 서비스홀더에 의해 생성되고 제어되기 때문에 둘의 관계를 이해해야 한다.
+ㅏ메라 객체를 만들고 서피스뷰를 보여주고 싶을 시 서피스홀더 객체의 setPreviewDisplay() 메소드로 미리보기를 설정해야 한다.
+
+
+    public void setPreviewDisplay(Surface sv)
+
+
+필요한 초기화 작업 후 카메라 객체의 startPreview() 메소드 호출할 수 있고, 이때부터 카메라로 입력된 영상을
+서피스뷰 화면에 보여주게 된다. 이때 타입은 TYPE SURFACE_TYPE_PUSH_BUFFERS 가 되어야 한다.
+
+다음은 카메라 미리보기를 하고 화면 버튼을 눌러 사진을 찍고 그 사진을 미디어 앨범에 저장하는 간단한 앱이다.
+sample_capturepreview.xml 파일을 만들고 다음과 같이 입력한다.
+
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/button112"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="사진 찍기" />
+
+        <FrameLayout
+            android:id="@+id/previewFrame"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
+
+
+버튼과 프레임을 추가하였고 프레임에 카메라 미리보기를 보이도록 할 것이다.
+이제 CameraSurfaceView 클래스는 나중에 작성하고 먼저 메인 액티비티부터 작성한다.
+
+
+    public class SurfaceViewActivity extends AppCompatActivity {
+        CameraSurfaceView cameraView;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_capturepreview);
+
+            FrameLayout previewFrame = findViewById(R.id.previewFrame);
+            cameraView = new CameraSurfaceView(this);
+            previewFrame.addView(cameraView);
+
+            Button button = findViewById(R.id.button112);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    takePicture();
+                }
+            });
+        }
+
+        public void takePicture() {
+            cameraView.capture(new Camera.PictureCallback() {
+                @Override
+                public void onPictureTaken(byte[] data, Camera camera) {
+                    try {
+                        Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+                        String outUriStr = MediaStore.Images.Media.insertImage(
+                                getContentResolver(),
+                                bitmap,
+                                "Captured Image",
+                                "Captured Image using Camera.");
+
+                        if (outUriStr == null) {
+                            Log.d("SampleCapture", "Image insert failed.");
+                            return;
+                        } else {
+                            Uri outUri = Uri.parse(outUriStr);
+                            sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, outUri));
+                        }
+
+                        camera.startPreview();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
+    }
+
+
+카메라 미리보기 구현은 CameraSurfaceView 는 SurfaceView 를 상속받아서 FrameLayout 에 추가한다.
+[사진 찍기] 버튼 누르면 사진을 한 장 찍어 미디어 앨범에 추가되는데 결과 처리 코드는 PictureCallback 인터페이스를
+구현하는 부분이 들어있다. 이 인터페이스는 CameraSurfaceView 에 정의된 capture() 메소드를 호출할 때 전달된다.
+
+
+    public abstract void onPictureTaken(byte[] data, Camera camera)
+
+
+즉, 사진을 찍을 때 자동으로 호출되는 onPictureTaken() 메소드로 캡처한 후 이미지 데이터가 전달된다.
+그 다음 이 데이터를 비트맵으로 만들어 MediaStore.Images.Media 의 insertImage() 메소드로 미디어 앨범에 추가한다.
+decodeByteArray() 메소드로 이미지를 추가한다.
+
+
+    public static final String insertImage(ContentResolver cr, Bitmap source, String title, String description)
+
+
+다음은 서피스뷰를 확장하여 정의한 CameraSurfaceView 클래스이다. 다음과 같이 내부 클래스로 작성하자.
+
+
+    public class CameraSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
+        private SurfaceHolder mHolder;
+        private Camera camera = null;
+
+        public CameraSurfaceView(Context context) {
+            super(context);
+
+            mHolder = getHolder();
+            mHolder.addCallback(this);
+        }
+
+        @Override
+        public void surfaceCreated(SurfaceHolder holder) {
+            camera = Camera.open();
+
+            try {
+                camera.setPreviewDisplay(mHolder);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            camera.startPreview();
+        }
+
+        @Override
+        public void surfaceDestroyed(SurfaceHolder holder) {
+            camera.stopPreview();
+            camera.release();
+            camera = null;
+        }
+
+        public boolean capture(Camera.PictureCallback handler) {
+            if (camera != null) {
+                camera.takePicture(null, null, handler);
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+
+setType() 메소드로 SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS 로 설정되어 카메라 미리보기를 사용할 수 있다.
+생성자 부분에는 이렇게 타입을 설정하는 것 외에도 서비스 홀더 객체를 getHolder() 메소드로
+addCallback() 메소드를 이용해 이 클래스에 Callback 룰 전달한다.
+
+서피스뷰가 만들어지며 surfaceCreated() 메소드 안에 Camera.open() 메소드를 이용해 카메라를 오픈하고
+이를 통해 카메라 객체에서 서비스 홀더 객체를 setPreviewDisplay() 로 지정한다.
+크기가 변경되거나 호출되면 surfaceChanged() 메소드 안에 startPreview() 메소드를 이용해 미리보기를 시작한다.
+만약 카메라 파라미터 설정이 필요하면 setParameters() 메소드를 이용해 필요한 파라미터를 설정할 수 있다.
+
+여기서 가로 세로 화면 의 미리보기의 경우엔 setPreviewSize() 메소드를 이용한 코드가 들어있다.
+서피스뷰 리소스를 해제하면서 호출되는 surfaceDestroyed() 메소드에는 카메라 객체의 stopPreview() 메소드를 호출하여
+미리보기를 끝낸 후 변수를 널값으로 지정하도록 한다.
+
+이제 만든 앱에서 카메라와 SD 카드를 접근하니 이 권한을 매니페스트에 추가하고 위험 권한에 대한 권한 부여를
+요청하는 코드를 추가한다.
+
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+
+
+동일하게 위험 권한 자동 부여도 추가한다.
+그 후에 메인 액티비티에 권한 부여 메소드를 추가한다.
+
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        ...
+
+        AutoPermissions.Companion.loadAllPermissions(this, 101);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        AutoPermissions.Companion.parsePermissions(this, requestCode, permissions, this);
+    }
+
+    @Override
+    public void onDenied(int i, String[] permissions) {
+        Toast.makeText(this, "permissions denied : " + permissions.length, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onGranted(int i, String[] permissions) {
+        Toast.makeText(this, "permissions granted : " + permissions.length, Toast.LENGTH_SHORT).show();
+    }
+
+
+이제 앱을 실행하여 사진을 찍어보자.
+서비스뷰로 카메라 미리보기 화면을 띄워 화면이 돌아가 있는 것을 볼 수 있다.
+이는 미리보기의 기본 모드가 가로 모드이기 때문이다. 카메라 미리보기의 화면이 세로 모드로 보이고 싶다면
+surfaceCreated() 메소드는 수정하고 setCameraOrientation() 메소드를 새로 추가하면 된다.
+
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        camera = Camera.open();
+        setCameraOrientation();
+        try {
+            camera.setPreviewDisplay(mHolder);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    ...
+
+    public void setCameraOrientation() {
+        if (camera == null) {
+            return;
+        }
+
+        Camera.CameraInfo info = new Camera.CameraInfo();
+        Camera.getCameraInfo(0, info);
+
+        WindowManager manager = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+        int rotation = manager.getDefaultDisplay().getRotation();
+
+        int degrees = 0;
+        switch (rotation) {
+            case Surface.ROTATION_0: degrees = 0; break;
+            case Surface.ROTATION_90: degrees = 90; break;
+            case Surface.ROTATION_180: degrees = 180; break;
+            case Surface.ROTATION_270: degrees = 270; break;
+        }
+
+        int result;
+        if (info.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+            result = (info.orientation + degrees) % 360;
+            result = (360 - result) % 360;
+        } else {
+            result = (info.orientation - degrees + 360) % 360;
+        }
+
+        camera.setDisplayOrientation(result);
+    }
+
+
+            13-3 음악 파일 재생하기
+
+멀티미디어를 위해 제공하는 미디어 API 는 android.media 패키지에 들어 있다.
+그 안의 여러 클래스들 중에서 핵심은 '미디어플레이어' 이다.
+이는 음악과 오디오 재생은 물론 동영상 재생도 가능하다. 하지만 기본적인 코덱만으로도 재생할 수 있다.
+오디오 재생을 위해 데이터 소스 지정은 크게 다음 세 가지이다.
+
+
+    1 인터넷의 파일 위치                미디어 위치 URL
+    2 프로젝트 파일에 포함한 위치       리소스 또는 에셋 파일의 위치
+    3 단말 SD 카드의 위치              단말의 SD 카드 위치
+
+
+미디어 플레이어로 음악 파일을 재생하는 과정은 다음 세 단계로 나눌 수 있다.
+첫 번재는 대상 파일을 알려주는 setDataSource() 메소드로 URI 지정.
+두 번재는 prepare() 메소드로 재생 준비. 이 단계에서 대상 파일의 며 프레임을 미리 읽어 정보 확인한다.
+세 번재에서 start() 메소드로 음악 파일을 재생한다.
+
+                    1. URL 지정
+    미디어플레이어     --->        오디오 파일 mp3
+    2. 준비 prepare()
+    3. 시작 start()
+
+
+이제 sample_audio.xml 파일을 만들고 네 버튼과 레이아웃을 추가한다.
+그리고 메인 액티비티를 작성한다.
+
+
+    public class AudioActivity extends AppCompatActivity {
+        public static final String AUDIO_URL = "https://sites.google.com/site/ubiaccessmobile/sample_audio.mp3";
+
+        MediaPlayer mediaPlayer;
+        int position = 0;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_audio);
+
+            Button button = findViewById(R.id.button113);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    playAudio(AUDIO_URL);
+                    Toast.makeText(getApplicationContext(), "음악 파일 재생 시작됨.", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            Button button2 = findViewById(R.id.button114);
+            button2.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (mediaPlayer != null) {
+                        mediaPlayer.stop();
+                        Toast.makeText(getApplicationContext(), "음악 파일 재생 중지됨.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+
+            Button button3 = findViewById(R.id.button115);
+            button3.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (mediaPlayer != null) {
+                        position = mediaPlayer.getCurrentPosition();
+                        mediaPlayer.pause();
+                        Toast.makeText(getApplicationContext(), "음악 파일 재생 일시정지됨.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+
+            Button button4 = findViewById(R.id.button116);
+            button4.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+                        mediaPlayer.start();
+                        mediaPlayer.seekTo(position);
+                        Toast.makeText(getApplicationContext(), "음악 파일 재생 재시작됨", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        }
+
+        private void playAudio(String url) {
+            killMediaPlayer();
+            try {
+                mediaPlayer = new MediaPlayer();
+                mediaPlayer.setDataSource(url);
+                mediaPlayer.prepare();
+                mediaPlayer.start();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        protected void onDestroy() {
+            super.onDestroy();
+            killMediaPlayer();
+        }
+
+        private void killMediaPlayer() {
+            if (mediaPlayer != null) {
+                try {
+                    mediaPlayer.release();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+MediaPlayer 객체로 음악을 재생하는 playAudio() 메소드의 구조를 보면 killMediaPlayer() 메소드를 호출한 후
+차례로 setDataSource(), prepare(), start() 메소드를 호출하고 있다.
+killMediaPlayer() 메소드애서 리소스를 해제하기 위해서 release() 메소드를 호출한다.
+
+재생 중지하고  다시 시작하기 위해 중지한 지점의 위치를 알기 위해 getCurrentPosition() 메소드로 현 지점 위치를
+저장해두었다 재시작 하면 해당 위치에서 시작한다.
+
+이 앱은 인터넷의 URL 위치의 미디어이기 때문에 인터넷 권한이 필요하다.
+
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:usesCleartextTraffic="true"
+
+
+애뮬레이터에선 오디오가 정상 동작이 되지 않을 수도 있기 때문에 실제 단말에서 테스트를 실행해본다.
+만약 미디어의 stop() 메소드로 재생 중지 시 또 다른 작업을 수행하고 싶다면
+MediaPlayer.OnCompletionListener 를 구현한 후에 미디어 플레이어 객체에 등록하면 된다.
+
+재생 중지되었을 때 호출되는 메소드는 다음과 같다.
+
+
+    public abstract void onCompletion(MediaPlayer mp)
+
+
+            13-4 동영상 재생
+
+동영상 재생도 오디오 재생과 같이 간단하다. 레이아웃에 <VideoView> 태그만 추가하면 재생할 수 있다.
+
+동영상 재생 실습을 위해 sample_video.xml 파일을 만들어 [재생하기] 버튼과 VideoView 를 추가한다.
+레이아웃에 추가한 비디오뷰 객체는 자바 코드에서 참조하여 파일 위치를 setVideoURI() 메소드로 지정만 하면 재생할 수 있다.
+동영상 재생에는 미디어 컨트롤러 객체로 설정할 수 있다. 메인 액티비티를 작성해보자.
+
+
+    public class VideoActivity extends AppCompatActivity {
+        public static final String VIDEO_URL = "https://sites.google.com/site/ubiaccessmobile/sample_video.mp4";
+        VideoView videoView;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_video);
+
+            videoView = findViewById(R.id.videoView);
+
+            MediaController mc = new MediaController(this);
+            videoView.setMediaController(mc);
+
+            Button button = findViewById(R.id.button117);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    videoView.setVideoURI(Uri.parse(VIDEO_URL));
+                    videoView.requestFocus();
+                    videoView.start();
+                }
+            });
+        }
+    }
+
+
+이 앱도 인터넷 파일을 받아오기 때문에 인터넷 권한이 필요하다.
+설정 후 확인해보자.
+
+
+            13-5 오디오 녹음하여 저장
+
+오디오 녹음이나 동영상 녹화는 미디어리코더가 사용된다.
+
+
+    1 미디어리코더 객체 생성          오디오 녹음을 위한 객체 생성
+    2 오디오 입력 및 출력 형식 설정   오디오 정보를 입력받을 데이터 소스와 출력 형식 설정
+    3 오디오 인코더와 파일 지정       오디오 파일 만들 인코더와 함께 파일 이름을 지정
+    4 녹음 시작                      녹음을 시작하면 오디오 파일 만들어지고 인코딩된 바이트 스트림이 저장됨
+    5 매니페스트에 권한 설정          앱에서 녹음하려면 RECORD_AUDIO 권한이 있어야하므로 추가
+
+
+실습을 위해 sample_audiorecorder.xml 을 만들어 네 개의 버튼을 추가한다.
+그리고 메인 액티비티를 다음과 같이 작성한다.
+
+
+    public class AudioRecorderActivity extends AppCompatActivity implements AutoPermissionsListener {
+        MediaRecorder recorder;
+        MediaPlayer player;
+
+        String filename;
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_main);
+
+            Button button = findViewById(R.id.button118);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startRecording();
+                }
+            });
+
+            ...
+        }
+
+        public void startRecording() {
+            if (recorder == null) {
+                recorder = new MediaRecorder();
+            }
+
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
+            recorder.setOutputFile(filename);
+
+            try {
+                recorder.prepare();
+                recorder.start();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        ...
+
+
+[녹음하기] 버튼을 누르면 MediaRecorder 객체를 생성하여 녹음에 필요한 정보를 설정한다.
+setAudioSource() 메소드는 오디오 입력 설정에 사용되며 마이크로 입력을 받으니
+MediaRecorder.AudioSource.MIC 상수로 설정한다. setOutputFormat() 메소드로 미디어 포멧 MediaRecorder.OutputFormat.MPEG_4 로 설정한다.
+setAudioEncoder() 메소드는 인코더 설정을 한다. setOutputFile() 메소드로 결과물 파일을 저장한다.
+
+녹음에 필요한 정보 설정 후엔 prepare() 와 start() 메소드로 녹음을 시작한다.
+
+
+    public void stopRecording() {
+        if (recorder == null) {
+            return;
+        }
+
+        recorder.stop();
+        recorder.release();
+        recorder = null;
+
+        ContentValues values = new ContentValues(10);
+
+        values.put(MediaStore.MediaColumns.TITLE, "Recorded");
+        values.put(MediaStore.Audio.Media.ALBUM, "Audio Album");
+        values.put(MediaStore.Audio.Media.ARTIST, "Mike");
+        values.put(MediaStore.Audio.Media.DISPLAY_NAME, "Recorded Audio");
+        values.put(MediaStore.Audio.Media.IS_RINGTONE, 1);
+        values.put(MediaStore.Audio.Media.IS_MUSIC, 1);
+        values.put(MediaStore.MediaColumns.DATE_ADDED,
+                System.currentTimeMillis()/1000);
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mp4");
+        values.put(MediaStore.Audio.Media.DATA, filename);
+
+        Uri audioUri = getContentResolver().insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values);
+        if (audioUri == null) {
+            Log.d("SampleAudioRecorder", "Audio insert failed.");
+            return;
+        }
+    }
+
+
+[녹음 중지] 버튼 클릭 시 stopRecording() 메소드가 호출된다.
+녹음 중지를 위해 stop() 과 release() 메소드가 호출된다.
+
+중지하였을 시에 결과물을 미디어 앨범에 등록하기 위해 제공자로 등록한다.
+새로운 값을 추가하기 위해 ContentValues 객체에 정보를 put() 하여 insert() 로 추가한다.
+이에 정보 중 MediaStore.MediaColumns.MIME_TYPE 은 미디어 파일 포맷을 의미하며
+여기엔 audio/mp4 로 지정한다. 음성 파일에 대한 제공자의 URI 는 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI 이므로
+ContentValues 객체 추가 시 URI 를 사용한다.
+
+녹음에는 RECORD_AUDIO 권한이 필요하다.
+
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+
+            13-6 동영상 녹화
+
+오디오 녹음의 MediaRecorder 는 동영상 녹화에도 사용할 수 있다.
+마이크는 MIC 상수를 이용했다면 카메라는 CAMERA 상수로 정의한다.
+
+
+    MediaRecorder.AudioSource.MIC
+    MediaRecorder.VideoSource.CAMERA
+
+
+sample_videorecorder.xml 파일을 만들어 이전 실습과 동일하게 레이아웃을 만들고 아래에 프레임를 추가한다.
+그리고 메인 액티비티는 다음과 같이 작성한다.
+
+
+    public class VideoRecorderActivity extends AppCompatActivity implements AutoPermissionsListener {
+        MediaPlayer player;
+        MediaRecorder recorder;
+
+        String filename;
+
+        SurfaceHolder holder;
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_main);
+
+            SurfaceView surface = new SurfaceView(this);
+            holder = surface.getHolder();
+            holder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+
+            FrameLayout frame = findViewById(R.id.container6);
+            frame.addView(surface);
+
+            Button button = findViewById(R.id.button122);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startRecording();
+                }
+            });
+
+            ...
+        }
+
+        public void startRecording() {
+            if (recorder == null) {
+                recorder = new MediaRecorder();
+            }
+
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            recorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
+            recorder.setVideoEncoder(MediaRecorder.VideoEncoder.DEFAULT);
+            recorder.setOutputFile(filename);
+
+            recorder.setPreviewDisplay(holder.getSurface());
+
+            try {
+                recorder.prepare();
+                recorder.start();
+            } catch (Exception e) {
+                e.printStackTrace();
+
+                recorder.release();
+                recorder = null;
+            }
+        }
+
+        public void stopRecording() {
+            if (recorder == null) {
+                return;
+            }
+
+            recorder.stop();
+            recorder.reset();
+            recorder.release();
+            recorder = null;
+
+            ContentValues values = new ContentValues(10);
+
+            values.put(MediaStore.MediaColumns.TITLE, "RecordedVideo");
+            values.put(MediaStore.Audio.Media.ALBUM, "Video Album");
+            values.put(MediaStore.Audio.Media.ARTIST, "Mike");
+            values.put(MediaStore.Audio.Media.DISPLAY_NAME, "Recorded Video");
+            values.put(MediaStore.MediaColumns.DATE_ADDED, System.currentTimeMillis() / 1000);
+            values.put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4");
+            values.put(MediaStore.Audio.Media.DATA, filename);
+
+            Uri videoUri = getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+            if (videoUri == null) {
+                Log.d("SampleVideoRecorder", "Video insert failed.");
+                return;
+            }
+
+            sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, videoUri));
+
+        }
+        ...
+
+
+SurfaceView 객체로 화면 FrameLayout 에추가하여 미리 보기를 보여주었다.
+서비스뷰에서 서비스홀더 객체를 참조하여 카메라 미리보기 화면으로 보이게 SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS 로 지정한다.
+
+MediaRecorder 객체를 사용하는 방법은 오디오를 녹음할 때와 동일한데 설정 정보 중에 setVideoSource() 메소드를 이용한 비디오 입력 정보 설정,
+그리고 setVideoEncoder() 메소드를 이용한 비디오 인코더 정보의 설정이 추가되어야 한다.
+여기서 비디오 입력이 카메라가 되니 MediaRecorder.VideoSource.CAMERA 상수를 파라미터로 전달한다.
+
+미리보기 이용을 위해 MediaRecorder 에서 setPreviewDisplay() 메소드로 화면을 설정한다.
+이때 서피스홀더 객체의 getSurface() 메소드를 사용하면 가져올 수 있다.
+Intent.ACTION_MEDIA_SCANNER_SCAN_FILE 액션으로 URI 객체를 브로드캐스팅한다.
+
+오디오 재생과 유사하게 MediaPlayer 객체의 setDisplay() 메소드로 서피스 홀더 객체를 설정해야 한다.
+
+
+    public void startPlay() {
+        if (player == null) {
+            player = new MediaPlayer();
+        }
+
+        try {
+            player.setDataSource(filename);
+            player.setDisplay(holder);
+
+            player.prepare();
+            player.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+이 앱에서도 RECORD_AUDIO 와 CAMERA 그리고 SD 카드 접근 권한이 필요하니 매니페스트에 권한을 추가하고
+앱을 실행하여 확인해본다.
+
+
+            13-7 유튜브 영상 재생
+
+보통 동영상은 유튜브 같은 공유 사이트에 올리는 경우가 많은데 이 경우의 재생도 확인해보자.
+유튜브 동영상 재생은 API 를 사용하여 재생할 수 있다.
+
+먼저 API 를 사용할 수 있도록 도와주는 jar 파일을 추가해야 한다.
+왼쪽 상단에 [Project Files] 로 변경한 후에 https://developers.google.com/youtube/android/player/downloads
+사이트에서 jar 파일을 다운로드 한다.
+zip 파일을 풀고난 후 jar 파일을 '/app/libs' 폴더에 복사해 넣는다.
+그리고 [Sync Project with Gradle Files] 를 클릭하여 인식하도록 한다.
+
+유튜브 재생 테스트를 위해 sample_youtube.xml 파일을 만들어 다음과 같이 작성한다.
+
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <Button
+            android:id="@+id/button126"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="시작" />
+
+        <com.google.android.youtube.player.YouTubePlayerView
+            android:id="@+id/playerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+
+YouTubePlayerView 패키지 이름까지 태그에 넣어야 한다.
+이 뷰 id 는 playerView 로 지정했다. 화면에 추가한 버튼을 누르면 이 뷰에 동영상이 재생될 것이다.
+
+이제 메인 액티비티를 다음과 같이 작성한다.
+
+
+    public class YoutubeActivity extends YouTubeBaseActivity {
+        YouTubePlayerView playerView;
+        YouTubePlayer player;
+
+        private static String API_KEY = "AIzaSyDWXmWuB7xjPaN5gwW2hlNtHr9nETESN7E";
+        private static String videoId = "A22oy8dFjqc";
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_youtube);
+
+            initPlayer();
+
+            Button button = findViewById(R.id.button126);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    playVideo();
+                }
+            });
+        }
+
+        public void initPlayer() {
+            playerView = findViewById(R.id.playerView);
+            playerView.initialize(API_KEY, new YouTubePlayer.OnInitializedListener() {
+                @Override
+                public void onInitializationSuccess(YouTubePlayer.Provider provider, YouTubePlayer youTubePlayer, boolean b) {
+                    player = youTubePlayer;
+
+                    player.setPlayerStateChangeListener(new YouTubePlayer.PlayerStateChangeListener() {
+                        @Override
+                        public void onLoading() {}
+
+                        @Override
+                        public void onLoaded(String id) {
+                            Log.d("PlayerView", "onLoaded 호출됨 : " + id);
+
+                            player.play();
+                        }
+
+                        @Override
+                        public void onAdStarted() {}
+
+                        @Override
+                        public void onVideoStarted() {}
+
+                        @Override
+                        public void onVideoEnded() {}
+
+                        @Override
+                        public void onError(YouTubePlayer.ErrorReason errorReason) {}
+                    });
+                }
+
+                @Override
+                public void onInitializationFailure(YouTubePlayer.Provider provider, YouTubeInitializationResult youTubeInitializationResult) {
+
+                }
+            });
+        }
+
+        public void playVideo() {
+            if (player != null) {
+                if (player.isPlaying()) {
+                    player.pause();
+                }
+                player.cueVideo(videoId);
+            }
+        }
+    }
+
+
+액티비티는 YouTubeBaseActivity 를 상속받아 작성한다. 그리고 YouTubePlayerView 와 youTubePlayer 자료형으로 된
+변수를 선언하고 API_KEY 와 videoId 를 선언해 놓는다.
+
+유튜브 재생을 위한 뷰를 찾아 참조하고 initialize 메소드로 뷰의 초기화를 도왔다.
+OnInitializedListener 객체를 전달하여 초기화 성공 시 onInitializationSuccess() 메소드를 호출하여
+YouTubePlayer 객체를 전달하여 변수에 할당한 후 setPlayerStateChangeListener() 메소드로 리스너 등록하여 Player 상태를
+관리하며 onLoaded() 메소드로 동영상 로딩완료되면 자동으로 호출하도록 했다.
+
+유튜브 인터넷에 검색하여 찾으니 인터넷 권한을 추가해야 한다.
+
+이제 앱을 실행하여 확인해보자.

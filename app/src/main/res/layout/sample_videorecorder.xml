@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical" android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <Button
+        android:id="@+id/button122"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="녹화시작" />
+
+    <Button
+        android:id="@+id/button123"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="녹화중지" />
+
+    <Button
+        android:id="@+id/button124"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="재생시작" />
+
+    <Button
+        android:id="@+id/button125"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="재생중지" />
+
+    <FrameLayout
+        android:id="@+id/container6"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+</LinearLayout>

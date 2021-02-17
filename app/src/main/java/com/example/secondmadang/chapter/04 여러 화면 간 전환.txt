@@ -1,0 +1,1149 @@
+            04-1 레이아웃 인플레이션 이해
+
+현재까진 한 XML 파일로 배치하고 구성할 뿐이었다.
+안드로이드는 앱 화면 배치를 알려주는 XML 레이아웃 파일과 화면 기능을 담당하는 자바 코드를 분리하여 개발했는데
+이는 레이아웃과 기능을 따로 관리하면 수월하기 때문이다.
+
+근데 이 두 파일은 어떻게 연결돼있을까?
+
+
+        XML 파일                      자바 코드
+    activity_main.xml   ->      setContentView(R.layout.activity_main);     -> 실행
+
+
+이런 코드를 보면 setContentView() 메소드가 XML 파일을 연결한다고 추측할 수 있다.
+
+
+    R.layout.레이아웃파일명
+
+
+여기 대문자 R 은 프로젝트 창의 res 폴더를 의미한다 layout 도 마찬가지로 layout 폴더이다.
+실제로 앱 실행 시 XML 레이아웃 내용이 메모리에 객체화되어 객체화된 XML 소스 파일에서 사용한다.
+이렇게 객체화되는 과정을 '인플레이션(Inflation)' 이라고 한다.
+
+
+    화면      메모리 로딩              레이아웃 파일
+
+    ┌───┐       □ ■ ■
+    │   │ ←     □ □ □       ← 실행    LinearLayout ...
+    └───┘
+
+
+XML 레이아웃은 앱 실행 시점에 인플레이션된다. 즉, XML 파일에 <Button> 태그를 정의한다면
+앱은 자신이 실행되기 전까진 버튼이 어디에 있는지 모른다. 실제로 자바 코드로 setContentView()
+메소드가 호출 전까지 XML 파일의 버튼을 찾아보자.
+
+inflation.xml 파일에 버튼을 하나 추가하고 InflationActivity.java 파일을 만들어 다음과 같이 코드를 작성한다.
+
+
+    public class InflationActivity extends AppCompatActivity {
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+
+            Button button = findViewById(R.id.button47);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Toast.makeText(getApplicationContext(), "버튼이 눌렸어요.", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            setContentView(R.layout.inflation);
+        }
+    }
+
+
+앱을 실행하면 앱이 중지되며 오류 메시지가 보인다. 심각한 오류때문에 멈추게 되는데
+이유는 인플레이션 되지 않은 상태로 객체를 참조하려고 했기 때문이다.
+
+이렇게 Logcat 창에 오류 로그가 나타나는데 많은 오류 중 중요한 하나의 오류는
+레이아웃을 객체화 전에 버튼을 참조했기 때문에 발생한 문제(널 포인트 예외)이다.
+
+
+    Caused by : java.lang.NullPointerException: Attempt to invoke virtual method
+
+
+이렇게 레이아웃 뷰들은 객체화가 필요한데 이 역할은 두 메소드가 있다.
+
+
+    public void setContentView(int layoutResID)
+    public void setContentView(View view [, ViewGroup.LayoutParams params])
+
+
+그렇다면 별도의 XML 레이아웃 파일을 부분적으로 로딩하여 보여줄 수는 없을까?
+일부분을 차지하는 별도의 XML 레이아웃을 정의하여 보여줄 수 있다.
+
+하지만 setContentView() 메소드는 액티비티의 화면 전체(메인 레이아웃)를 설정하는 역할만 수행한다.
+즉, 부분 화면을 인플레이션할 수 없다. 부분 화면을 인플레이션하려면 인플레이터를 사용해야 한다.
+이를 위해 안드로이드는 LayoutInflater 라는 클래스를 제공한다. 근데 LayoutInflater 클래스는 시스템 서비스로
+제공하는 클래스라서 getSystemService() 메소드로 LayoutInflater 객체를 참조하고 사용해야 한다.
+
+
+    getSystemService(Context.LAYOUT_INFLATER_SERVICE)
+
+
+다음 일부 화면을 XML 레이아웃으로 정의하고 인플레이터로 메인 레이아웃에 추가하는 과정을 나타내는 것이다.
+
+
+                                    추가
+    메인 화면 레이아웃              ←       뷰 그룹
+    /res/layout/activity_main.xml           ↑   인플레이션(inflation)
+                                        부분 레이아웃 파일
+                                        /res/layout/sub1.xml
+
+
+메인 레이아웃은 자바 코드에서 setContentView(R.layout.activity_main)과 같은 방법으로 인플레이션하고
+일부분 화면은 LayoutInflater 객체로 뷰그룹 객체로 인플레이션한 후 메인 레이아웃에 추가해야 한다.
+
+실습을 위해 inflation_main.xml 파일을 만들고 다음과 같이 작성한다.
+
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:id="@+id/textView25"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="버튼을 눌러 화면을 추가하세요."
+            android:textSize="20sp" />
+
+        <Button
+            android:id="@+id/button48"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="추가하기" />
+
+        <LinearLayout
+            android:id="@+id/container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical" />
+    </LinearLayout>
+
+
+밑의 리니어는 부분 화면이 들어갈 공간을 확보하기 위해 넣었다.
+이제 버튼을 클릭하면 새로운 XML 레이아웃을 인플레이션하여 안쪽 리니어에 넣어보자.
+
+부분화면으로 쓸 레이아웃도 만들어보자. sub1.xml 파일을 만든다.
+
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:id="@+id/textView24"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="부분 화면 1"
+            android:textSize="30sp" />
+
+        <CheckBox
+            android:id="@+id/checkBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="동의합니다." />
+    </LinearLayout>
+
+
+이렇게 만든 부분 레이아웃은 전체 레이아웃의 [추가하기] 버튼을 클릭하여
+안쪽 리니어에 추가해본다. InflationMainActivity.java 를 생성하여 다음 코드를 작성한다.
+
+
+    public class InflationMainActivity extends AppCompatActivity {
+        LinearLayout container;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.inflation_main);
+
+            container = findViewById(R.id.container);
+
+            Button button = findViewById(R.id.button48);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    LayoutInflater inflater = (LayoutInflater)
+                            getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+                    inflater.inflate(R.layout.sub1, container, true);
+                    CheckBox checkBox = container.findViewById(R.id.checkBox);
+                    checkBox.setText("로딩되었습니다.");
+                }
+            });
+        }
+    }
+
+
+전체 레이아웃의 안쪽 리니어 id 는 container 이다. 이를 참조하여 버튼 클릭 시
+부분 레이아웃(sub1.xml)의 내용을 인플레이션하여 getSystemService() 메소드로 LayoutInflater 객체를 참조한 후
+해당 인플레이터의 inflate() 메소드 파라미터로 R.layout.sub1, container 를 전달하여
+부분 레이아웃의 뷰를 인플레이션 과정을 거치게 된다.
+
+sub1.xml 가 객체화되어 이 안의 뷰들을 id 로 참조할 수 있게 되었다.
+CheckBox 를 참조하여 '로딩되었습니다.' 로 텍스트 값을 바꾸어보았다.
+
+이렇게 XML 레이아웃을 구성하는 것이 일반적이며 XML 레이아웃을 만들지 않고 코드에서 직접 new Button(this) 로
+부모 컨테이너에 추가하는 방법도 있다. 하지만 이런 방식은 소스 코드 양이 많아지므로 XML 레이아웃을 사용하는 것이 좋다.
+
+다시 LayoutInflater 객체의 inflate() 메소드를 다시 살펴보자.
+
+
+    View inflate(int resource, ViewGroup root)
+
+
+첫 번째로 XML 레이아웃 리소스를, 두 번째론 부모 컨테이너를 지정한다.
+
+LayoutInflater 객체는 시스템 서비스로 제공되어 getSystemService() 메소드를 호출하는 방법을 사용하거나
+LayoutInflater 클래스의 from() 메소드로 참조할 수도 있다.
+
+
+    static LayoutInflater LayoutInflater.from(Context context)
+
+
+            04-2 여러 화면 간 전환
+
+대부분 앱은 화면 전환을 하며 실행된다.
+다음은 안드로이드 앱의 구성 요소이다.
+
+
+    액티비티, 서비스 ,브로드캐스트 수신자, 내용 제공자
+
+
+앱은 위와 같은 네가지 요소가 대표적이다.
+새 프로젝트를 만들면 위와 같은 네 요소가 포함되어 있는데 매니페스트의 <activity> 태그에 이런 정보가 포함하고있다.
+만약 새로운 액티비티를 만들어 앱에 추가하면 이 매니페스트 파일에 새 액티비티 정보를 추가해야한다.
+그래야 새 액티비티에 대한 정보를 알 수 있다.
+
+액티비티를 소스 코드에 띄울 때 startActivity() 메소드를 사용하면 되며 이 메소드는 단순히 액티비티를 화면에 띄운다.
+하지만 실제로 띄워야할 화면이 많아져 화면을 닫고 메인 화면으로 돌아올 때 데이터를 새로 적용해야 하는 경우가 자주 생긴다.
+즉, 단순히 띄우는 것이 아닌 어떤 것을 띄울지, 원래 액티비티로 돌아오면서 어떤 응답을 받아 처리할 지 코드들이 필요하게 된다.
+이런 기능은 단순히 띄우는 startActivity() 메소드가 아닌 startActivityForResult() 메소드를 사용해야 해결할 수 있다.
+
+
+    startActivityForResult(Intent intent, int requestCode)
+
+
+startActivityForResult() 메소드는 인텐트와 정수로된 코드 값을 파라미터로 받는다.
+새 액티비티에서 원래 액티비티로 돌아오면서 응답을 받아 처리해야하는 경우 어느 액티비티로부터 온 응답인지
+구분하여 처리할 수 있어야 한다. 이때 startActivityForResult() 메소드로 만든다.
+
+왼쪽 프로젝트 창에서 [app] 을 마우스 오른쪽으로 클릭하고 [New -> Activity -> Empty Activity] 를 선택하여
+MenuActivity 액티비티를 추가한다. 그 후 매니페스트 파일을 열어보자. 그러면 새로운 <activity> 가 추가되었을 것이다.
+다음과 같이 속성들을 추가하자.
+
+
+    <activity android:name=".MenuActivity"
+        android:label="메뉴 액티비티"
+        android:theme="@style/Theme.AppCompat.Dialog">
+
+    </activity>
+
+
+label 속성은 화면 제목 설정이고 theme 속성은 테마를 설정할 때 사용한다.
+@style/Theme.AppCompat.Dialog 를 선택하면 액티비티가 대화 상자 형태로 나타난다.
+
+새 액티비티를 추가했으니 activity_menu2.xml 파일을 열어서 화면 가운데 버튼을 추가하여 '돌아가기' 로 수정한다.
+
+
+    public class MenuActivity extends AppCompatActivity {
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_menu2);
+
+            Button button = findViewById(R.id.button49);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent();
+                    intent.putExtra("name", "mike");    // 인텐트 객체 생성 후 name 값을 부가
+                    setResult(RESULT_OK, intent);   // 응답 보내기
+                    finish();   // 현재 액티비티 없애기
+                }
+            });
+        }
+    }
+
+
+버튼 클릭 시 Intent 객체를 만들어 setResult() 메소드를 호출하고 있다.
+바로 이 setResult() 메소드를 호출할 때 인텐트 객체가 파라미터로 전달된다.
+setResult() 메소드는 새로 띄운 액티비티를 이전 액티비티로 인텐트를 전달하고 싶을 때
+사용하는 메소드로 호출할 때의 형식은 다음과 같다.
+
+
+    setResult(응답 코드, 인텐트);
+
+
+첫 번째 파라미터로 응답 코드를 전달할 수 있다. 이 응답 코드와 인텐트는 새 액티비티를 띄운 원래 액티비티에 전달된다.
+finish() 메소드는 현 액티비티를 화면에서 없애고 싶을 때 사용한다. 메뉴 액티비티를 만들었으니 이제 메인 액티비티에서
+이 액티비트를 띄울 차례이다. 메인 액티비티로 activity_main2.xml 파일을 만든다.
+
+
+    public class MainActivity2 extends AppCompatActivity {
+        public static final int REQUEST_CODE_MENU = 10;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_main2);
+
+            Button button = findViewById(R.id.button50);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(getApplicationContext(), MenuActivity.class);
+                    startActivityForResult(intent, REQUEST_CODE_MENU);
+                }
+            });
+        }
+    }
+
+
+새로운 액티비티를 띄울 때 startActivityForResult() 메소드를 호출한 점에 주목하자.
+이 메소드는 startActivity() 메소드처럼 새 액티비티를 띄우지만 새 액티비티로부터 응답을 받을 수 있다.
+파라미터로 지정된 REQUEST_CODE_MENU 는 새 액티비티 띄울 때 보낼 요청 코드이다.
+하지만 앱에 들어갈 액티비티가 여러 개라면 중복되지 않는 값으로 정해야 한다.
+이 값은 나중에 새 액티비티로부터 응답 받을 때 다시 전달받을 값이기 때문이다.
+
+
+                띄우기 : 요청 코드
+                    →
+    액티비티 A                  액티비티 B
+                    ←
+            응답하기 : 요청 코드, 응답 코드
+
+
+버튼 누를 때 onClick() 메소드 안에 인텐트 객체를 하나 만들어 startActivityForResult() 메소드를 호출했다.
+인텐트 객체는 액티비티를 띄울 목적으로 사용되었고 액티비티 간에 데이터를 전달하는 데에도 사용될 수 있다.
+인텐트 객체를 만들 때 두 번째 파라미터로 메뉴 액티비티의 클래스 인스턴스인 MenuActivity.class 를 전달한다.
+첫 번째파라미터로 Context 객체가 전달되는데, 액티비티 객체는 컨텍스트가 될 수 있어 this 를 시용할 수 있지만
+이벤트 처리 메소드 안에서 this 로 참조할 수 없어서 getApplicationContext() 메소드로 전달한다.
+
+이번텐 MenuActivity 로부터 받은 응답을 처리하는 메소드를 추가한다.
+MainActivity2 에서 onActivityResult 메소드를 재정의한다.
+
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if(requestCode == REQUEST_CODE_MENU) {
+            Toast.makeText(getApplicationContext(),
+                    "onActivityResult 메소드 호출됨. 요청 코드 : " + requestCode +
+                            ", 결과 코드 : " + resultCode, Toast.LENGTH_LONG).show();
+
+            if(resultCode == RESULT_OK) {
+                String name = data.getStringExtra("name");
+                Toast.makeText(getApplicationContext(), "응답으로 전달된 name : " + name,
+                        Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+
+onActivityResult() 메소드는 새로 띄운 메뉴가 응답을 보내면 그 응답을 처리하는 역할을 한다.
+
+
+    protected void onActivityResult (int requestCode, int resultCode, Intent intent)
+
+
+첫 번째 파라미터는 액티비티 띄울 때 전달한 요청 코드와 같다. 이 값으로 어떤 액티비티로부터 받은 것인지 구분할 수 있다.
+두 번째 파라미터는 새 액티비티로 전달된 응답 코드이다. 처리 결과가 정상인지 아닌지를 구분하는데 사용된다.
+보통 Activity.RESULT_OK 상수로 정상 처리임을 알린다.
+세 번째 파라미터는 전달 받은 인텐트이다. 이 인텐트 안에 새 액티비티의 데이터를 전달할 수 있다.
+인텐트 객체는 주로 새 액티비티로부터 원래의 액티비티로 데이터를 전달할 때 사용할 수 있다.
+여기에 데이터를 담는 방법은 putExtra() 메소드를 사용할 수 있다. 이 메소드 이용 시 키(Key) 와 밸루(Value) 쌍으로 넣어야 한다.
+
+
+    1. 새로운 액티비티 생성
+        새 액티비티 추가 시 자바 코드와 XML 파일, 매니페스트에 액티비티 태그 추가
+    2. 새로운 액티비티의 XML 레이아웃 정의
+    3. 메인 액티비티에서 새 액티비티 바꾸기
+        버튼 클릭 시 startActivityForResult() 메소드로 새 액티비티 띄움
+    4. 새 액티비티에서 응답 보내기
+        새 액티비티 보인 후 그 안의 버튼에서 클릭 시 setResult() 메소드로 응답 보냄
+    5. 응답 처리
+        메인 액티비티에 onActivityResult() 메소드 재정의하여 새로 띄운 액티비티가 보내는 응답을 처리
+
+
+            04-3 인텐트 살펴보기
+
+인텐트는 무언가 작업을 수행하기 위해 사용되는 일종의 명령 또는 데이터를 전달하는데 사용한다.
+지금까지 startActivity() 나 startActivityForResult() 메소드로 호출하여 전달하는 방법으로 인텐트를 시스템에 전달했다.
+그럼 시스템 인텐트는 단말에 이미 설치된 다른 앱의 액티비티를 띄운 것이다.
+
+
+        인텐트의 역할과 사용 방식
+
+인텐트는 android.content 패키지 안에 정의된 인텐트는 앱 구성 요소 간의 작업 수행을 위한 정보를 전달하는 역할을 한다.
+다른 앱 구성 요소에 인텐트를 전달할 수 있는 대표적인 메소드는 다음과 같다.
+
+
+    startActivity() 또는 startActivityForResult()
+    startService() 또는 bindService()
+    broadcastIntent()
+
+
+startService() 는 서비스 시작할 때, broadcastIntent() 메소드는 인텐트 객체를 브로드캐스팅 방식으로 전송할 때 사용된다.
+이 메소드들을 호출 시 인텐트가 파라미터로 액티비티, 서비스, 브로듴스트 수신자로 전달할 수 있다.
+
+기본 요소는 '액션, 데이터' 이다. 액션은 수행할 기능이고 데이터는 수행될 대상의 데이터이다.
+대표적인 액션으로 ACTION_NEW, ACTION EDIT 등이 있다.
+
+
+    속성                          설명
+
+    ACTION_DIAL tel: 010...     주어진 전화번호로 전화걸기
+    ACTION_NEW tel: 010...      주어진 전화번호로 전화걸기.
+    ACTION_EDIT content://contacts/people   전화번호부 데아터베이스 정보 중 ID 값이 2인 정보를 편집하는 화면
+    ACTION_VIEW content://contacts/people   전화번호부 데이터베이스의 내용을 보여줌
+
+
+인텐트에 포함된 데이터는 포맷이 어떤건지 확인 후 자동으로 찾아 띄워준다.
+http 처럼 특정 포맷을 사용하면 MIME 타입으로 구분된다.
+
+다음은 인텐트 생성자들이다.
+
+
+    intent()
+    intent(Intent o)
+    intent(String action [, Uri uri])
+    Intent(Context packageContext, Class<?> cls)
+    Intent(String action, Uri uri, Context packageContext, Class<?> cls)
+
+
+인텐트에 클래스 객체나 컴포넌트 이름을 지정하여 호출할 대상을 확실히 알 수 있는 경우 '명시적 인텐트' 라 한다.
+액션과 데이터 지정했지만 호출 대상이 달라질 수 있는 경우 '암시적 인텐트' 라 한다.
+암시적 인텐트는 MIME 타입에 따라 시스템에 적절한 다른 앱의 액티비티를 찾은 후 띄우는 방식을 사용하게 된다.
+
+암시적 인텐트는 액션과 데이터로 구성되지만 그 외에도 대표적으로 '범주(Category)', '타입(Type)',
+'컴포넌트(Component)' 그리고 '부가 데이터(Extras)' 를 들 수 있다.
+
+
+        범주(Category)
+
+액션 실행 시 필요한 추가 정보를 제공한다. 예로 CATEGORY_LAUNCHER 는 최상위 앱으로 설치된 앱들의 목록을 보여주는
+애플리케이션 런처 화면에 이 앱을 보여줘야 한다는 것을 의미한다.
+
+
+        타입(Type)
+
+인텐트에 들어갈 데이터의 MIME 타입을 명시적으로 지정한다. 보통 MIME 타입은 데이터만으로도 구별 가능하지만
+명시적으로 지정할 필요가 있는 경우도 있다.
+
+
+        컴포넌트(Component)
+
+인텐트에 사용될 컴포넌트 클래스 이름을 명시적으로 지정한다. 보통 이 정보는 인텐트의 다른 정보를 통해
+결정된다. 이 속성이 지정될 경우 지정된 컴포넌트가 실행되도록 한다.
+새 액티비티 정의하고 그 액티비티 클래스를 인텐트에 전달하여 실행하는 방법도 컴포넌트를 지정하는 방식과 같다.
+
+
+        부가 데이터(Extra Data)
+
+인텐트 추가적인 정보를 넣을 수 있는 번들(Bundle) 객체를 담고 있다.
+이 객체를 통해 인텐트 안에 더 많은 정보를 넣어 다른 앱 구성 요소에 전달할 수 있다.
+예로 이메일 보낼 액션이면 이메일 제목, 내용 등 부가 데이터로 전달할 수 있다.
+
+인텐트 실습을 위해서 call_intent.xml 파일을 만들어 다음과 같이 작성한다.
+
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <EditText
+            android:id="@+id/text4"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="tel:010-6848-0083"
+            android:textSize="24sp" />
+
+        <Button
+            android:id="@+id/button51"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="전화걸기" />
+    </LinearLayout>
+
+
+이제 CallIntentActivity.java 파일을 만들고 다음과 같이 코드를 작성한다.
+
+
+    public class CallIntentActivity extends AppCompatActivity {
+        EditText editText;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.call_intent);
+
+            editText = findViewById(R.id.text4);
+
+            Button button = findViewById(R.id.button51);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    String data = editText.getText().toString();
+
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(data));
+                    startActivity(intent);
+                }
+            });
+        }
+    }
+
+
+앱을 통해 버튼을 누르면 전화거는 화면으로 이동한다.
+
+이제 두번째의 경우를 살펴보자. 이전 레이아웃 파일에 새 버튼을 하나 더 추가하고 '메뉴 화면 띄우기' 글자가 표시되게 한다.
+메뉴 화면은 왼쪽 [Empty Activity] 추가로 만든다.
+
+
+    Button button2 = findViewById(R.id.button52);
+    button2.setOnClickListener(new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            Intent intent = new Intent();
+            intent.putExtra("name", "mike");    // 인텐트 객체 생성 후 name 값을 부가
+            setResult(RESULT_OK, intent);   // 응답 보내기
+            finish();   // 현재 액티비티 없애기
+        }
+    });
+
+
+컴포넌트 이름은 ComponentName 객체를 만들어 인텐트에 설정하는데 두 개의 파라미터는 각각 패키지 이름, 클래스 이름이 된다.
+앱을 실행해 보면 기존 새 액티비티 클래스 객체를 전달해 띄우는 것과 동일한 결과가 나타난다.
+
+다음은 인텐트 클래스에 정의된 다양한 액션 정보를 보여준다.
+
+
+    ACTION_NEW              ACTION_VIEW
+    ACTION_ATTACH_DATA      ACTION_ANSWER
+    ACTION_EDIT             ACTION_INSERT
+    ACTION_PICK             ACTION_DELETE
+    ACTION_CHOOSER          ACTION_RUN
+    ACTION_GET_CONTENT      ACTION_SYNC
+    ACTION_DIAL             ACTION_PICK_ACTIVITY
+    ACTION_CALL             ACTION_SEARCH
+    ACTION_SEND             ACTION_ACTION_WEB_SEARCH
+    ACTION_SENDTO           ACTION_FACTORY_TEST
+
+
+            04-4 플래그와 부가 데이터 사용하기
+
+액티비티로 만든 화면이 한 번 메모리에 만들어져도 계속 startActivity() 나 startActivityForResult() 메소드를
+여러 번 호출하면 동일한 액티비티가 메모리에 여러 개 만들어질 것이다. 왜냐면 시스템이 인텐트별로 새로 띄우기 때문이다.
+이러면 중복된 액티비티가 새로 뜨는데 그래서 [BACK] 버튼으로 아래의 액티비티가 나타난다.
+중복된 액티비티를 띄우지 않으려면 플래그(Flag)를 사용하여 조정할 수 있다.
+
+
+        플래그
+
+플래그 이해를 위해 액티비티 처리 방식을 알아보자.
+액티비티는 액티비트 매니저(ActivityManager)란 객체로 액티비티 스택에 관리된다.
+차곡차곡 쌓이다 상위의 액티비티가 없어지면 이전 액티비티가 다시 화면에 보인다.
+
+
+                        실행                  화면
+    새로운 액티비티(new)   →           실행 액티비티
+                                정지/실행 ↓  ↑ 재실행
+
+                                이전 실행 액티비티
+                                액티비티 #n-1
+                                    ...
+                                액티비티 #1
+
+
+새 액티비티가 매니페스트로 등록되어 메소드 호출로 띄워지면 이전 액티비티는 스택에 저장되고 새 액티비티를 화면에
+보이게하는 구조이다. 그래서 이전 화면들은 뒤에 차곡차곡 가려져 있다고 볼 수 있다.
+
+일반적으로 스택 구조는 동일한 액티비티가 여러번 스택에 들어가면 문제가 발생할 수 있다.
+이 문제를 해결하는 것이 플래그인데 대표적인 플래그들은 다음과 같다.
+
+
+    FLAG_ACTIVITY_SINGLE_TOP
+    FLAG_ACTIVITY_NO_HISTORY
+    FLAG_ACTIVITY_CLEAR_TOP
+
+
+첫 번째로는 FLAG_ACTIVITY_SINGLE_TOP 는 액티비티 생성 시 이미 생성된 것이 있다면 그대로 사용하라는 플래그이다.
+다음은 플래그 사용하지 않을 때와 FLAG_ACTIVITY_SINGLE_TOP 플래그를 사용할 때 비교한 것으로
+두 번째 액티비티가 두 번 실행되었지만 액티비티는 한 개만 만들어져 있고 사용된 두번째 파라미터가
+그대로 사용된 것을 알 수 있다.
+
+
+    NO_FLAG 상황
+                                   액티비티 #2
+                   액티비티 #2     액티비티 #2
+    액티비티 #1     액티비티 #1     액티비티 #1
+
+
+    FLAG_ACTIVITY_SINGLE_TOP 사용
+
+
+                   액티비티 #2     액티비티 #2
+    액티비티 #1     액티비티 #1     액티비티 #1
+
+
+결국 사용했던 동일 액티비티를 사용하게 된다.
+근데 새로 만들지 않고 기존 액티비티가 다시 보이면 인텐트 객체는 어떻게 전달할까?
+
+새 액티비티를 띄우는 액티비티가 부모 액티비티라면, 전달하는 인텐트는 새로 만들어진 인텐트의 onCreate() 메소드 안에서
+getIntent() 메소드로 참조할 수 있다. 근데 액티비티 새로 만들어지지 않고 재사용된다면 onCreate() 로 호출되지 않는다.
+이 경우 새로 띄어질 때 인텐트 객체를 전달 받아 처리하는 방법이 따로 있어야 한다.
+바로 onNewIntent() 메소드이다. 이 메소드를 재정의하면 액티비티가 새로 만들어지지 않을 때 인텐트 객체만 전달 받을 수 있다.
+
+
+    부모 액티비티         액티비티 새로 만들어질 때
+        인텐트                 onCreate()
+          └──────────────────> getIntent()
+
+
+    부모 액티비티         액티비티 재사용 시
+        인텐트
+          └──────────────────> onNewIntent()
+
+
+    조언
+
+    액티비티가 이미 메모리에 있다면 onCreate() 는 호출되지 않으니 onNewIntent() 를 재정의해야 한다.
+
+
+    public void onNewIntent(Intent intent)
+
+
+두 번째 플래그 FLAG_ACTIVITY_NO_HISTORY 로 설정하는 경우가 있는데, 이 플래그로 설정 시 처음 이후에 실행된
+액티비티는 스택에 추가되지 않는다. 즉, 항상 맨 처음 실행된 액티비티가 바로 보이게 된다.
+이 플래그는 알람 이벤트가 발생하여 사용자에게 한 번 알림 화면을 보일 때 유용하다.
+알림 화면은 한 번만 보여주면 되므로 여러 알람 이벤트가 발생해도 그 화면만 보이는 형태로 만들 수 있다.
+FLAG_ACTIVITY_NO_HISTORY 의 화면 처리는 다음과 같다.
+
+
+    NO_FLAG 상황
+                                   액티비티 #1
+                   액티비티 #2     액티비티 #2      액티비티 #2
+    액티비티 #1     액티비티 #1     액티비티 #1     액티비티 #1
+
+
+    FLAG_ACTIVITY_SINGLE_TOP 사용
+
+
+                   액티비티 #2     액티비티 #1
+    액티비티 #1     액티비티 #1     액티비티 #1     액티비티 #
+
+
+세 번째로 FLAG_ACTIVITY_CLEAR_TOP 으로 설정하면 이 액티비티 위의 다른 액티비티를 모두 종료시키게 된다.
+홈화면 같이 다른 액티비티보다 항상 우선되는 액티비티를 만들 때 유용하게 사용할 수 있다.
+만약 홈화면이 여러 개 있는 것이 아닌 하나만 만들어지는 것으로 하고 싶을 때 FLAG_ACTIVITY_SINGLE_TOP 플래그와
+함께 설정하면 항상 하나의 객체가 메모리에 존재하면서 그 상위 액티비티를 모두 종료시킬 수 있다.
+다음은 FLAG_ACTIVITY_CLEAR_TOP 의 화면 처리는 다음과 같다.
+
+
+    NO_FLAG 상황
+                                   액티비티 #1
+                   액티비티 #2     액티비티 #2
+    액티비티 #1     액티비티 #1     액티비티 #1
+
+
+    FLAG_ACTIVITY_SINGLE_TOP 사용
+
+
+                   액티비티 #2
+    액티비티 #1     액티비티 #1     액티비티 #1
+
+
+        부가 데이터
+
+
+한 액티비티에서 다른 액티비티를 띄울 때 데이터를 전달해야 할 상황이 있다.
+로그인 화면에서 로그인 버튼 누르면 로그인을 성공하면 메뉴 화면으로 아이디(또는 이름)를 전달하여
+표시해야 할수도 있다. 어떻게 하면 로그인 화면에서 메뉴 화면으로 아이디를 전달할 수 있을까?
+가장 간단하게는 별도 클래스로 정적 변수를 만들어 두 화면에서 해당 변수를 참조하게 하는 방법이 있다.
+
+하지만 안드로이드는 다른 앱에서 만든 화면을 띄울 수도 있어 변수 공유 방식은 데이터를 전달하는 것이 불가능할 수 도 있다.
+따라서 기본적으로 액티비티 띄울 때 전달되는 인텐트 안에 부가 데이터(Extra data)를 넣어 전달하는 방법을 권장한다.
+
+인텐트 안에는 번들(Bundle) 객체가 있는데, 해시 테이블과 유사하여 putExtra() 과 getOOOExtra() 메소드로 데이터를 넣거나
+뺄 수 있다. 문자로 빼고 싶다면 getStringExtra() 를 사용할 수 있다.
+
+
+            putExtra()
+    문자열 넣기  →
+                            번들
+    문자열 빼기  ←
+            getStringExtra()
+
+
+기본적으로 기본 자료형을 넣었다 뺄 수 있지만 바이트 배열이나 Serializable 객체도 넣었다 뺄 수 있다.
+
+이렇게 넣는 데이터를 부가 데이터라 하며 시스템에서는 건드리지 않고 다른 앱 구성 요소로 전달한다.
+번들안에는 키와 값을 쌍으로 넣으며 문자열과 정수 그리고 이진 값을 넣거나 뺄 때의 메소드는 다음과 같다.
+
+
+    intent putExtra(String name, String value)
+    intent putExtra(String name, int value)
+    intent putExtra(String name, boolean value)
+
+    String getStringExtra(String name)
+    int getIntExtra(String name, int defaultValue)
+    boolean getBooleanExtra(String name, boolean defaultValue)
+
+
+getOOO() 형태의 메소드는 데이터 값이 없으면 디폴트 설정인 defaultValue 가 반환된다.
+또 전달할 데이터가 Object 자료형은 전달할 수 없으며 객체 데이터는 바이트 배열로 변환하거나 Serializable 인터페이스를
+구현하여 직렬화한 다음 전달해야 한다.
+
+근데 안드로이드는 객체 전달 시 Serializable 인터페이스와 유사한 Parcelable 인터페이스를 권장한다.
+이 인터페이스는 직렬화했을 때 크기가 작아 안드로이드 내부에 데이터 전달에 자주 사용된다.
+이는 다음 두가지 메소드를 모두 구현해야 한다.
+
+
+    public abstract int describeContents()
+    public abstract void writeToParcel(Parcel dest, int flags)
+
+
+describeContents() 메소드는 직렬화할 객체 유형을 구분한다. 여기선 단순히 0을 반환하도록 한다.
+writeToParcel() 메소드는 객체가 가지는 데이터를 Parcel 객체로 만드는 역할을 한다.
+Parcel 는 번들처럼 readOOO() 와 writeOOO() 메소드를 제공하여 기본 데이터 타입을 넣고 확인할 수 있다.
+위 메소드를 모두 구현 후 CREATOR 란 상수를 만들어야 하며 이는 Parcel 로부터 데이터를 읽어 객체를 생성하는 역할을 한다.
+이 객체는 상수로 정의되고 반드시 static final 로 선언되어야 한다.
+
+이제 Parcelable 인터페이스를 구현하고 새 객체를 정의한 후 인텐트에 넣어 전달해보자.
+parcel_intent.xml 파일을 만들어 버튼을 하나 추가해보자. 버튼엔 '메뉴 화면 띄우기' 러 살장힌다.
+버튼 클릭 시 Parcelable 자료형을 객체로 인텐트에 넣어 메뉴 화면에 전달할 예정이다.
+
+새 액티비티를 추가하여 MenuActivity2.java 와 activity_menu2.xml 을 추가한다.
+그리고 Parcelable 자료형을 객체로 전달하기 위해서 먼저 클래스를 정의한다.
+SimpleData 를 입력하여 Parcelable 을 구현하는 클래스를 만든다.
+
+
+    public class SimpleData implements Parcelable {
+        int number;
+        String message;
+
+        public SimpleData(int num, String msg) {
+            number = num;
+            message = msg;
+        }
+
+        public SimpleData(Parcel src) { // Parcel 객체 읽기
+            number = src.readInt();
+            message = src.readString();
+        }
+
+        public static final Parcelable.Creator<SimpleData> CREATOR = new Parcelable.Creator<SimpleData>() {   // CREATOR 상수
+            @Override
+            public SimpleData createFromParcel(Parcel source) {
+                return new SimpleData(source);  // SimpleData 생성자를 호출해 Parcel 객체 읽기
+            }
+
+            public SimpleData[] newArray(int size) {
+                return new SimpleData[size];
+            }
+        };
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeInt(number);
+            dest.writeString(message);
+        }
+    }
+
+
+writeToParcel() 메소드는 이 SimpleData 객체의 데이터를 Parcel 객체로 만드는 역할을 한다.
+그래서 이 메소드의 writeInt() 와 writeString() 메소드가 있다.
+또한 Parcel 객체를 파라미터로 받을 때 readInt() 와 readString() 메소드로 데이터를 읽어 들인다.
+
+CREATOR 객체를 상수로 정읳되어 있어 객체가 만들어지는 코그가 들어가므로 new SimpleData() 와 같이
+SimpleData 객체를 만드는 부분을 볼 수 있다. 결과적으로 SimpleData 클래스 안에 Parcel 객체의 데이터를 읽는
+부분과 Parcel 객체로 쓰는 부분을 정의한다.
+
+이제 메인 액티비티의 소스 코드를 수정하여 버튼 클릭 시 메뉴 액티비티를 띄우는 코드를 추가한다.
+
+
+    public class MainActivity3 extends AppCompatActivity {
+        public static final int REQUEST_CODE_MENU = 101;
+        public static final String KEY_SIMPLE_DATA = "data";
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.parcel_intent);
+
+            Button button = findViewById(R.id.button53);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(getApplicationContext(), MenuActivity2.class);
+                    SimpleData data = new SimpleData(100, "Hello Android!");
+                    intent.putExtra(KEY_SIMPLE_DATA, data);
+                    startActivityForResult(intent, REQUEST_CODE_MENU);
+                }
+            });
+        }
+    }
+
+
+앞서 정의한 SimpleData 클래스로 객체를 만드는 부분을 보면 정수 100, 문자열 "Hello Android!" 로 Parcel 객체로 만들어진다.
+인텐트 객체의 putExtra() 메소드를 사용하여 SimpleData 객체를 부가 데이터로 추가했다면
+이 SimpleData 객체는 메뉴 액티비티에서 꺼내 사용할 수 있다.
+
+마지막으로 메뉴 화면을 수정하자. 텍스트뷰, 버튼을 하나씩 추가한다.
+그 후 MenuActivity2.java 파일의 코드를 수정한다.
+
+
+    public class MenuActivity2 extends AppCompatActivity {
+        TextView textView;
+
+        public static final String KEY_SIMPLE_DATA = "data";
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_menu2);
+
+            textView = findViewById(R.id.textView26);
+            Button button = findViewById(R.id.button54);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent();
+                    intent.putExtra("name", "mike");
+                    setResult(RESULT_OK, intent);
+
+                    finish();
+                }
+            });
+
+            Intent intent = getIntent();
+            processIntent(intent);
+        }
+
+        private void processIntent(Intent intent) {
+            if(intent != null) {
+                Bundle bundle = intent.getExtras();
+                SimpleData data = bundle.getParcelable(KEY_SIMPLE_DATA);
+                if (intent != null) {
+                    textView.setText("전달 받은 데이터\nNumber : " + data.number
+                            + "\nMessage : " + data.message);
+                }
+            }
+        }
+    }
+
+
+onCreate() 메소드에 getIntent() 메소드를 호출했다. getIntent() 메소드에 인텐트 객체가 반환되므로 이 객체 안의 번들 객체를
+참조할 수 있다. getExtra() 메소드를 호출하면 Bundle 자료형의 객체가 반환된다. 이렇게 번들 객체를 참조한 후
+getOOO() 형태의 메소드를 사용해도 되고, 번들 객체를 참조하지 않은 인텐트 객체에는 getOOOExtra() 형태로 사용해도 된다.
+그리고 번들 객체에 키는 메인 액티비티와 또 다른 액티비티 모두 KEY_SIMPLE_DATA 같은 이름으로 정의되어 있다.
+
+
+            04-5 태스트 관리 이해하기
+
+실행한 앱은 한 프로세스 위에 동작하며 VM(Virtual Machine, 가상 머신)이 만들어져 이 위애 또 앱이 실행된다.
+그럼 어떻게 전화 앱을 띄울까? 우리는 시스템으로 인텐트를 보내는 방법으로 전화 앱을 띄웠다.
+근데 프로세스는 독립적이어서 프로세스 간에 정보 공유는 어렵다. 그래서 태스트(Task)라는 것이 만들어졌다.
+태스크는 앱이 어떻게 동작할 지 결정하는 데 사용된다.
+
+
+                태스크
+    액티비티 #1     →       액티비티 #2
+
+    액티비티 #1             액티비티 #2
+
+    VM                      VM
+
+    Process #1              Process #2
+
+
+        프로세스와 태스크
+
+프로세스는 독립적이라고 했는데. 한 프로세스에서 다른 프로세스를 띄우려면 시스템의 도움이 필요하다.
+이런 액티비티의 각종 정보를 저장하기 위해 태스크를 만드는데 만약 앱에서 전화 앱의 화면을 띄우지 않고
+전화 앱을 따로 실행시키면 전화 앱의 태스크는 우리 앱과 별도로 만들어진다.
+
+시스템은 알아서 태스크를 관리하지만 우리가 직접 제어해야하는 경우도 생긴다.
+이를 위해 매니페스트 파일에 액티비티 등록 시 태스트도 함께 설정할 수 있다.
+
+실습을 위해 sample_task.xml 파일을 만든다. 여기에 텍스트뷰 글자를 '첫 번째 화면' 으로 바꾸고 글자를 30sp 로 한다.
+텍스트뷰 아래엔 버튼을 하나 추가하고 '나 자신 띄우기' 글자로 수정한다.
+
+
+    public class TaskActivity extends AppCompatActivity {
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_task);
+
+            Button button = findViewById(R.id.button55);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(getApplicationContext(), TaskActivity.class);
+                    startActivity(intent);
+                }
+            });
+
+        }
+    }
+
+
+버튼을 반복 클릭하면 같은 첫 화면이 반복적으로 중첩되어 뜨는 것을 알 수 있다.
+이것은 AndroidManifest.xml 파일에서 TaskActivity 를 등록하는 <activity> 태그에
+launchMode 속성을 추가하고 그 값을 standard 한 것과 같다.
+다시 말하면 다음과 같다.
+
+
+                        태스크
+
+    TaskActivity    →       TaskActivity    →       TaskActivity
+
+
+        TaskActivity
+
+        VM
+
+        Process #1
+
+
+AndroidManifest.xml 파일에 <activity> 태그 안에 launchMode 속성을 추가한다.
+그 값을 singleTop 으로 설정하면 태스크 가장 위의 액티비티는 더 이상 새로 만들지 않게 된다.
+앞서 인텐트 플래스 설정 시 FLAG_ACTIVITY_SINGLE_TOP 과 같은 효과이다.
+
+
+    <activity
+        android:name=".TaskActivity"
+        android:launchMode="singleTop">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+    </activity>
+
+
+앱 실행 후 버튼을 여러번 누르고 시스템 [BACK] 을 눌러보자. 그럼 화면이 꺼진다.
+이는 TaskActivity 가 한 번만 실행된 것을 알 수 있다. 앞서 설명했지만 TaskActivity 로 전달되는 인텐트는
+onNewIntent() 메소드로 전달받아야 한다.
+
+
+            04-6 액티비티 생명 주기와 SharedPreferences 이해하기
+
+안드로이드가 지원하는 멀티태스킹은 음악을 들으며 웹 사이트를 검색하는 등 여러 앱이 동시에 실행되는 기능은
+앱이 실행되는 환경을 시스템이 계속 모니터링해야 할 필요가 있게 만든다.
+
+액티비티는 스택에 보관하다가 현재 화면에 보여줬다 사라지면 다시 이전 액티비티가 동작하는데
+이 때문에 한 액티비티가 화면에 보이거나 보이지 않을 때 다른 액티비티 상태에 영향을 미칠 수 있다.
+예로 앱 실행 중 전화가 오면 통화 앱으로 들어가고 실행 중인 앱은 중지될 수 있다.
+
+이처럼 메모리에 만들어지고 실행과 중지, 해제되는 과정의 상태 정보를 갖고 있으며, 이 상태 정보로
+시스템이 관리하며 각각 상태에 해당하는 메소드를 자동으로 호출하게 된다.
+예로 액티비티에 기본으로 만들어진 onCreate() 메소드는 액티비티가 만들어질 때 시스템이 자동으로 호출하는
+메소드이다. 이런 상태는 다음과 같은 여러가지 정보가 있다.
+
+
+    상태                  설명
+
+    실행(Running)         화면상에 액티비티가 보이며 실행되는 상태. 최상위에 있으며 포커스를 가지고 있음
+    일시 정지(Paused)     사용자에게 보이지만 다른 액티비티가 위에 있어 포커스를 받지 못한 상태.
+                            대화상자 때문에 일부가 가려진 경우도 해당
+    중지(Stopped)         다른 액티비티에 의해 완전 가려져 보이지 않음
+
+
+이런 상태 변화로 액티비티의 '생명 주기(Life Cycle)' 가 존재한다.
+
+
+                새로운 액티비티        onCreate() > onStart() > onResume()
+    ┌──────────>     ↓
+    │                실행
+    │    onResume()↓   ↓ onPause()
+    │             일시정지
+    │                ↓   onStop()
+    └───────────    중지
+                     ↓   onDestroy()
+                    소멸
+
+
+처음 액티비티가 만들어지면 onCreate(), onStart(), onResume() 순으로 호출되고 화면에 보인다.
+새로 액티비티가 실행되면 onPause() 메소드로 일지 정지 또는 중지 상태로 변한다.
+onStop() 메소드는 중지 상태로 변경될 때 자동으로 호출되는 메소드다.
+일시 정지나 중지 상태로 갈 때 호출되는 onPause() 메소드처럼 액티비티가 다시 호출될 때 onResume() 이 호출된다.
+만약 메모리에 없어질 경우 onDestroy() 를 호출한다.
+
+
+    상태 메소드      설명
+
+    onCreate()      액티비티 처음 만들 때 호출됨
+                    화면에 보이는 뷰의 일반적인 상태 설정
+                    이전 상태 저장되어 있을 시 번들 객체 참조하여 복원 가능
+                    이 메소드 다음 항상 onStart() 호츨됨
+
+    onStart()       액티비티 화면 보이기 바로 전에 호출됨
+                    액티비티 화면 상에 보이면 이 메소드 다음 onResume() 호출됨
+                    액티비티 화면에 가려지면 이 다음에 onStop() 호출됨
+
+    onResume()      액티비티가 사용자와 상호작용하기 전에 호출됨
+
+    onRestart()     액티비티 중지된 후 호출된 메소드로 다시 시작되기 전에 호출됨
+                    이 메소드 다음 항상 onStart() 호출됨
+
+    onPause()       다른 액티비티 시작할 시 호출됨
+                    저장되지 않은 데이터를 저장소에 저장하거나 애니메이션 중 작업 중지하는 기능 수행
+                    이 메소드가 리턴되기 전에 다음 액티비티가 시작될 수 없으니 매우 빨리 수행되어야함
+                    액티비티가 상태에 들어가면 시스템 액티비티를 강제 종료할 수 없음
+
+    onStop()        액티비티가 사용자에게 더 이상 보이지 않을 때 호출됨
+                    액티비티 소멸 도는 다른 액티비티가 화면에 가릴 때 호출됨
+                    액티비티가 이 상태에 들어가면 시스템은 액티비트를 강제 종료할 수 있음
+
+    onDestroy()     액티비티 소멸 직전에 호출됨
+                    이 메소드는 액티비티가 받는 마지막 호출
+                    액티비티가 앱에 의해 종료(finish()) 도는 시스템이 강제로 종료시키는 경우 호출됨
+                    위 두가지 부분은 isFinishing() 메소드를 이용
+                    액티비티가 이 상태에 들어가면 시스템은 액티비티를 강제 종료할 수 있음
+
+
+게임 같은 실제 앱 구성 시 전화가 오면 멈췄다가 이후에 다시 돌아갈 수 있어야 힌다.
+이 경우 onPause() 와 onResume() 을 사용하여 앱을 멈춰 다시 보일때는 상태를 저장했다가 복원해야 한다.
+
+이런 방법 외에도 액티비티를 중지시키기 전에 호출되는 onSaveInstanceState() 메소드를 이용해
+데이터를 임시로 저장할 수도 있다. onSaveInstanceState() 메소드의 파라미터로 전달되는 번들 객체를 이용해
+데이터를 저장하면 onCreate() 메소드나 onRestoreInstanceState() 메소드로 저장했던 데이터가 전달된다.
+이 방식을 사용하면 앱이 강제 종료되거나 비종료된 후에도 앱이 재실행되었을 때의 상태 그대로 보일 수 있다.
+
+생명주기마다 토스트 메시지로 확인을 해보자. sample_lifecycle.xml 을 만들고
+버튼 하나와 텍스트뷰를 하나 추가한다.
+메뉴 액티비티를 하나 더 만들고 동일하게 '돌아가기' 라는 버튼을 추가한다.
+버튼을 누르면 메인 액티비티는 액티비티 스택에 들어가 생명 주기 변화가 토스트 메시지로 나타나게 한다.
+
+
+    public class LifeCycleActivity extends AppCompatActivity {
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_lifecycle);
+            Toast.makeText(this, "onCreate 호출됨", Toast.LENGTH_LONG).show();
+        }
+
+        @Override
+        protected void onStart() {
+            super.onStart();
+            Toast.makeText(this, "onStart 호출됨", Toast.LENGTH_LONG).show();
+        }
+
+        @Override
+        protected void onStop() {
+            super.onStop();
+            Toast.makeText(this, "onStop 호출됨", Toast.LENGTH_LONG).show();
+        }
+
+        @Override
+        protected void onDestroy() {
+            super.onDestroy();
+            Toast.makeText(this, "onDestroy 호출됨", Toast.LENGTH_LONG).show();
+        }
+
+        @Override
+        protected void onPause() {
+            super.onPause();
+            Toast.makeText(this, "onPause 호출됨", Toast.LENGTH_LONG).show();
+        }
+
+        @Override
+        protected void onResume() {
+            super.onResume();
+            Toast.makeText(this, "onResume 호출됨", Toast.LENGTH_LONG).show();
+        }
+    }
+
+
+앱을 실행하면 토스트 메시지가 라이프 사이클대로 나타난다.
+토스트 메시지는 여러번 실행되면 이전 메시지가 보이지 않을 수도 있어
+println 으로 logcat 창에 출력해도 좋다.
+
+로그 창이 너무 많이 출력되면 "Main" 이란 태그로 검색할 수도 있다.
+이렇게 액티비티 생성부터 실행까지 자동으로 메소드가 호출되어 시스템에서 자동으로 호출하는 메소드를 '콜백 메소드' 라 한다.
+
+앱을 실행하면 생명 주기가 콘솔에 출력되며 이를 보면 순서를 쉽게 알 수 있다.
+
+화면에 보일때는 onCreate, onStart, onResume 순이고 [BACK] 버튼으로 화면을 없앨 때는 onPause, onStop, onDestroy 순서로
+호출된다.
+그리고 화면이 보일때와 안보일때 항상 onResume() 과 onPause() 메소드가 호출되는데 이는 앱의 저장과 복원이 필요하기 때문이다.
+
+앱 안에 간단한 데이터를 저장하거나 복원 시엔 SharedPreferences 를 사용할 수 있다.
+이것은 앱 내부에 파일을 하나 만드는데 이 파일 안에 데이터를 저장하거나 읽어올 수 있게 한다.
+
+LifeCycleActivity 자바 파일을 열어서 입력상자를 하나 추가하여 앱을 실행하여 사람 이름을 입력하고
+앱 종료 후 다시 실행했을 때 사람 이름이 그대로 보이도록 만들어보자. 이는 onPause() 로 데이터를 저장하고
+onResume() 메소드 안에서 복원하는 코드이다.
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        println("onPause 호출됨");
+        saveState();    // 현재 입력 상자의 데이터 저장
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        println("onResume 호출됨");
+        restoreState(); // 설정 정보에 저장된 데이터 복원
+    }
+
+    protected void restoreState() {
+        SharedPreferences pref = getSharedPreferences("pref", Activity.MODE_PRIVATE);
+        if((pref != null) && (pref.contains("name"))) {
+            String name = pref.getString("name", "");
+            editText.setText(name);
+        }
+    }
+
+    protected void saveState() {
+        SharedPreferences pref = getSharedPreferences("pref", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.putString("name", editText.getText().toString());
+        editor.commit();
+    }
+
+    protected void clearState() {
+        SharedPreferences pref = getSharedPreferences("pref", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
+        editor.clear();
+        editor.commit();
+    }
+
+
+saveState() 메소드는 현재 입력 상자의 데이터를 저장한다.
+저장 시 SharedPreferences 를 사용하여 pref 문자열을 저장소의 이름으로 사용한다.
+SharedPreferences 객체를 사용하려면 getSharedPreferences() 메소드를 참조해야한다.
+그리고 SharedPreferences.Editor 객체는 데이터를 저장할 수 있는 edit() 메소드를 제공하는데
+edit() 메소드 호출 후 putOOO() 메소드로 저장하려는 데이터를 설정할 수 있다.
+데이터를 저장한 후에는 commit() 메소드를 호출해야 실제로 저장된다.
+
+restoreState() 메소드는 설정 정보에 저장된 데이터를 가져와서 토스트 메시지를 보여준다.
+이렇게 정보를 담고 있는 데이터를 저장하고 다시 복원하기 위해 만든 saveState() 와 restoreState() 메소드는
+onPause() 와 onResume() 메소드에 들어가야 한다. 그래야 액티비티 화면에서 사라지거나 또는
+화면이 복원될 때 그 상태로 사용자에게 보여줄 수 있다.
+
+앱 실행 후 화면이 없어졌다 다시 보일 때 어떻게 보일지 확인해보자.
+onSaveInstanceState() 메소드와 onRestoreInstanceState() 메소드도 액티비티 상태와 관련하여 호출되니
+앞의 코드를 대신하여 사용할 수 있다.

@@ -1,0 +1,685 @@
+            09-1 핸들러 이해
+
+프로세스 안에서 일련의 기능이 순서대로 실행될 때 대부분 큰 문제가 없지만,
+대기 시간이 길어지는 네트워크 요청 등의 기능을 수행할 때는 화면에 보이는 UI 도 멈춤 상태로 있는 문제가 생길 수 있다.
+
+이 문제를 해결하기 위해 한 프로세스 안에 여러 작업이 동시 수행되는 멀티 스레드 방식을 사용하게 된다.
+스레드는 동시 수행이 가능한 작업의 단위이며, 현재 수행 중인 작업 외의 기능을 동시에 처리할 때 새 스레드를 만들어 처리한다.
+이런 멀티 스레드 방식은 같은 프로세스 안에 들어 있으며 메모리 리소스를 공유하므로 효율적인 처리가 가능하다.
+하지만 동시에 리소스에 접근할 때 데드락(DeadLock)이 발생하여 시스템이 비정상 동작할 수도 있다.
+
+여러 스레드가 동시에 공통 메모리 리소스에 접근할 때 데드락이 발생한다. 데드락이란
+동시에 두 곳 이상에 요청이 생겼을 때 어떤 것을 먼저 처리할지 판단할 수 없어 발생하는
+시스템 상의 문제이다. 이 경우 런타임시의 예외 상황이니 디버깅이 쉽지 않은 경우가 많다.
+
+
+    공통 메모리 소스                   공통 메모리 리소스
+            ↑                   ↗             ↑             ↖
+        메인 스레드          스레드 #1      스레드 #2      스레드 #3
+
+
+지연 시간이 길어질 수 있는 앱이면 오랜 시간 작업을 수행하는 코드를 별도로 분리하여 다음 UI 에 응답을 보내는 방식을 사용한다.
+이를 위해 안드로이드는 두 가지 시나리오를 정리하면 다음과 같다.
+
+
+    구분              시나리오
+
+    서비스 사용      백그라운드 작업은 서비스로 실행하고 사용자에게 알림 서비스로 알려줌.
+                    메인 액티비티에 결과 값을 전달하고 이를 이용한 다른 작업을 수행하고자 하면 브로드캐스팅으로 결과값 전달
+
+    스레드 사용      스레드는 같은 프로세스 안에 있어 작업 수행의 결과를 바로 처리할 수 있다.
+                    그러나 UI 객체는 직접 접근할 수 없어 핸들러(Handler) 객체를 사용한다.
+
+
+안드로이드에서 UI 처리 시 사용되는 기본 스레드를 '메인 스레드' 라고 부른다.
+메인 스레드에서 이미 UI 에 접근하고 있으니 새로 생성한 다른 스레드에선 핸들러(Handler) 객체를 사용해
+메시지를 전달함으로써 메인 스레드에서 처리하도록 만들 수 있다.
+
+
+        스레드 사용
+
+안드로이드에선 표준 자바 스래드를 그대로 사용할 수 있다. 스레드를 실습하기 위해 sample_thread.xml 를 만들자.
+버튼 글자는 '스레드 시작' 으로 수정한다.
+그리고 버튼을 누르면 스레드를 하나 만들어 동작시키도록 메인 액티비티를 만든다.
+
+
+    public class ThreadActivity extends AppCompatActivity {
+        int value = 0;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_thread);
+
+            Button button = findViewById(R.id.button91);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    BackgroundThread thread = new BackgroundThread();
+                    thread.start();
+                }
+            });
+        }
+
+        class BackgroundThread extends Thread {
+            public void run() {
+                for (int i = 0; i < 100; i++) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception e) {}
+
+                    value += 1;
+                    Log.d("Thread", "value : " + value);
+                }
+            }
+        }
+    }
+
+
+버튼을 누르면 스레드가 동작하고 value 변수 값은 스레드에 의해 1 초마다 1 씩 증가한다.
+이런 기능을 수행하는 스레드를 BackgroundThread 란 이름으로 정의하여 스레드를 상속받고 있다.
+이는 start() 메소드를 호출하여 시작하였으며, 그 안에 run() 메소드가 실행된다.
+
+앱을 실행하고 버튼을 누른 후 로그에서 확인해보자.
+이제 Logcat 이 아닌 화면에 value 값을 출력하도록 수정해본다.
+텍스트뷰를 추가하고 자바 코드로 이 텍스트뷰의 값을 바꿔주는 코들를 작성한다.
+
+
+    public class ThreadActivity extends AppCompatActivity {
+        int value = 0;
+
+        TextView textView;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_thread);
+
+            textView = findViewById(R.id.textView44);
+
+            Button button = findViewById(R.id.button91);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    BackgroundThread thread = new BackgroundThread();
+                    thread.start();
+                }
+            });
+        }
+
+        class BackgroundThread extends Thread {
+            public void run() {
+                for (int i = 0; i < 100; i++) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception e) {}
+
+                    value += 1;
+                    Log.d("Thread", "value : " + value);
+                    textView.setText("value 값 : " + value);
+                }
+            }
+        }
+    }
+
+
+소스 코드에는 에러 표시가 없지만 앱을 실행하면 정상적으로 실행되지 않고 에러가 발생한다.
+앱이 비정상 종료되고 에러 메시지를 살펴보면 직접 만은 BackgroundThread 객체에서 UI 객체를
+직접 접근했다는 말을 하고 있다. 결국 메인 스레드에서 관리하는 UI 객체는
+직접 만든 스레드 객체에선 접근할 수 없다는 의미이다. 이는 핸들러를 이용하여 해결한다.
+
+
+        핸들러로 메시지 전송
+
+앱을 실행할 때마다 프로세스가 만들어져 메인 스레드가 함께 생성된다.
+그리고 최상위에 관리되는 앱 구성 요소인 액티비티, 브로드 캐스트 수신자 등과 새로 만들어진 윈도우를 관리하기 위한
+메시지 큐(Message Queue)를 실행한다. 이는 순차적으로 코드를 수행할 수 있는데, 메시지 큐로 메인 스레드에서
+처리할 메시지를 전달하는 역할을 핸들러 클래스가 담당한다.
+결국 핸들러는 실행할 특정 기능이 있으면 핸들러가 포함된 스레드에서 순차적으로 실행시킬 때 사용하게 된다.
+핸들러를 이용하면 특정 메시지가 미래의 어느 시점에 실행되도록 스케줄링 할 수도 있다.
+
+
+                                    ┌   메인 스레드
+                                핸들러 3 handleMessage
+            1 obtainMessage
+                    ←             ↑
+    스레드 #1                      □ □ □
+                    →           메시지 큐
+            2 sendMessage
+
+
+새로 만든 스레드(스레드 #1)가 수행하려는 정보를 메인 스레드로 전달하기 위해선 먼저 핸들러가 관리하는 메시지 큐에서
+처리할 수 있는 메시지 객체 하나를 참조해야 한다. 이 첫 과정에선 obtainMessage() 메소드를 이용할 수 있으며
+호출 결과로 메시지 객체를 반환받게 된다. 이 메시지 객체에 필요한 정보를 넣은 후 sendMessage() 메소드를 이용해
+메시지 큐에 넣을 수 있다. 메시지 큐에 들어간 메시지는 순서대로 핸들러가 처리하게 되며 이때 handleMessage() 메소드에
+정의된 기능이 수행된다. 이때 handleMessage() 에 들은 코드가 수행되는 위치는 새로 만든 스레드가 아닌 메인 스레드가 된다.
+
+앞서 만든 프로젝트에 핸들러를 적용해보기 위해 ThreadActivity2.java 를 만들어 다음과 같이 작성한다.
+
+
+    public class ThreadActivity2 extends AppCompatActivity {
+        TextView textView;
+
+        MainHandler handler;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_thread);
+
+            textView = findViewById(R.id.textView44);
+
+            Button button = findViewById(R.id.button91);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    BackgroundThread thread = new BackgroundThread();
+                    thread.start();
+                }
+            });
+
+            handler = new MainHandler();
+        }
+
+        class BackgroundThread extends Thread {
+            int value = 0;
+
+            public void run() {
+                for (int i = 0; i < 100; i++) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception e) {}
+
+                    value += 1;
+                    Log.d("Thread", "value : " + value);
+
+                    Message message = handler.obtainMessage();
+                    Bundle bundle = new Bundle();
+                    bundle.putInt("value", value);
+                    message.setData(bundle);
+
+                    handler.sendMessage(message);
+                }
+            }
+        }
+
+        class MainHandler extends Handler {
+            @Override
+            public void handleMessage(@NonNull Message msg) {
+                super.handleMessage(msg);
+
+                Bundle bundle = msg.getData();
+                int value = bundle.getInt("value");
+                textView.setText("value 값 : " + value);
+            }
+        }
+    }
+
+
+Handler 클래스를 상속한 MainHandler 클래스가 새로 정의되었다. Handler 와 Message 는 android.os 패키지의 클래스를 사용한다.
+Handler 클래스엔 handleMessage() 메소드가 들어 있어 이 메소드를 다시 정의하면 메시지가 메인 스레드에서 수행될 때
+필요한 기능을 넣어둘 수 있다. 이렇게 정의한 핸들러는 onCreate() 메소드에서 액티비티가 초기화될 때 new 연산자를
+이용해 객체로 만들어진다.
+
+새로 만든 스레드 객체에서 수행한 작업 결과는 핸들러 객체의 obtainMessage() 로 메시지 객체를 하나를 참조한 후
+sendMessage() 메소드를 이용해 메시지 큐에 넣게 된다. 근데 데이터를 전달하고자 할 때는 setText() 메소드를
+handleMessage() 메소드 안으로 이동해야 하니 이 handleMessage() 메소드로 value 값 전달하는데 문제가 생긴다.
+따라서 이 value 값을 Message 객체에 넣어 보낼 필요가 있다.
+Message 객체에 Bundle 객체가 있어 putooo() 메소드로 데이터를 넣었다가 getooo() 메소드로 얻을 수 있다.
+
+
+        Runnable 객체 실행
+
+지금까지 핸들러를 사용해 메시지를 전송하고 순서대로 이를 실행하는 방법을 살펴봤다.
+이 방법은 일반적이지만 복잡하게 보이는 단점이 있다.
+핸들러 클래스는 메시지 전송 방법 외에 Runnable 객체를 실행할 수 있는 방법을 제공한다.
+즉, 새로 만든 Runnable 객체를 핸들러의 post() 메소드로 전달해주면 이 객체에 정의된 run() 메소드 코드로 실행된다.
+
+앞 단락에서 Runnable 객체 실행 방식으로 바꿔본다.
+
+
+    public class ThreadActivity3 extends AppCompatActivity {
+        TextView textView;
+
+        Handler handler = new Handler();    // API 기본 핸들러 객체 생성
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_thread);
+
+            textView = findViewById(R.id.textView44);
+
+            Button button = findViewById(R.id.button91);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    BackgroundThread thread = new BackgroundThread();
+                    thread.start();
+                }
+            });
+        }
+
+        class BackgroundThread extends Thread {
+            int value = 0;
+
+            public void run() {
+                for (int i = 0; i < 100; i++) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception e) {}
+
+                    value += 1;
+                    Log.d("Thread", "value : " + value);
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            textView.setText("value 값 : " + value);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+
+메시지 처리를 위해 ProgressHandler 클래스는 이제 더 이상 필요가 없으니 일반적으로 사용하는 Handler 클래스를 생성한다.
+Handler 객체를 만들어 변수에 할당하면 이 객체에 post() 메소드로 호출할 수 있다.
+스레드 안에서 결과를 텍스트뷰에 표시하려면 post() 메소드를 호출하면서 Runnable 객체를 만들어준다.
+그리고 그 안에 텍스트뷰를 접근하는 코드를 넣어 준다. 이렇게 결과를 텍스트뷰에 보여주는 코드가 스레드 안에
+있을 수 있으니 좀 더 코드를 이해하기 쉽다.
+
+이 코드처럼 post() 메소드로 전달되는 Runnable 객체는 스레드의 작업 결과물로 만들어지는 데이터를 처리해야 한다.
+따라서 결과물을 화면에 보여주어야 하는 부분이 있다면 new 연산자로 Runnable 인터페이스를 구현하는 것이 일반적이다.
+
+
+            09-2 일정 시간 후에 실행
+
+웹서버와 같은 원격 서버에 접속한 후 웹페이지를 요청할 때 응답이 늦어지거나 응답이 없으면 앱이 대기하고 있는 상황이
+지속되는 문제가 생긴다. 이때 기본적으로 별도의 스레드를 만들어 처리하게 된다. 하지만 버튼 클릭하여 간단히 접속 처리하는 경우
+메인 스레드 내에 지연 시간을 주는 것만으로도 UI 의 멈춤 현상을 방지할 수 있다.
+단순히 Thread.sleep() 메소드를 사용해 잠깐 대기 상태로 있다가 다시 실행할 수 있다. 하지만 핸들러로 지연 시간을
+주었을 때 핸들러로 실행되는 코드는 메시지 큐를 통과하면서 순차적으로 실행되기 때문에 UI 객체들에 영향을 주지 않으면서
+지연 시간을 두고 실행된다.
+
+일정 시간 후에 실행되는 예제를 실습하기 위해 새로운 sample_delayed.xml 파일을 만들어 텍스트뷰 하나와 버튼을 추가한다.
+버튼은 '요청하기' 로 수정하고 텍스트뷰는 '결과' 로 글자를 수정한다.
+
+
+    public class DelayedActivity extends AppCompatActivity {
+        TextView textView;
+
+        Handler handler = new Handler();
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_delayed);
+
+            textView = findViewById(R.id.textView45);
+
+            Button button = findViewById(R.id.button92);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    request();
+                }
+            });
+        }
+
+        private void request() {
+            String title = "원격 요청";
+            String message = "데이터를 요청하시겠습니까?";
+            String titleButtonYes = "예";
+            String titleButtonNo = "아니오";
+            AlertDialog dialog = makeRequestDialog(title, message, titleButtonYes, titleButtonNo);
+            dialog.show();
+        }
+
+        private AlertDialog makeRequestDialog(CharSequence title, CharSequence message,
+                                              CharSequence titleButtonYes, CharSequence titleButtonNo) {
+            AlertDialog.Builder requestDialog = new AlertDialog.Builder(this);
+            requestDialog.setTitle(title);
+            requestDialog.setMessage(message);
+            requestDialog.setPositiveButton(titleButtonYes, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    textView.setText("5초 후에 결과 표시됨");
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            textView.setText("요청 완료됨");
+                        }
+                    }, 5000);
+                }
+            });
+
+            requestDialog.setNegativeButton(titleButtonNo, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+
+                }
+            });
+
+            return requestDialog.create();
+        }
+    }
+
+
+코드를 입력할 때 Handler 는 android.os 패키지를 선택하고 AlertDialog 는 androidx.appcompat 패키지를 선택한다.
+[요청하기] 버튼을 누르면 새로 정의한 request() 메소드가 호출되는데 이 메소드는 AlertDialog 를 이용하여 대화상자를 보여준다.
+대화상자의 [예] 버튼을 누르면 핸들러 객체의 postDelayed() 메소드가 약간의 시간이 지난 후 실행되게 한다.
+
+핸들러는 메시지 큐를 사용하니 메시지들을 순서대로 처리하지만 메시지를 넣을 때 시간을 지정하면 원하는 시간에
+메시지를 처리하게 만들 수 있다. 따라서 일정 시간 후 실행시킬 때 유용하게 사용된다.
+시간을 지정할 때는 핸들러의 sendMessage() 메소드와 유사한 이름을 가진 다음과 같은 두 가지 메소드를 사용할 수 있다.
+
+
+    public boolean sendMessageAtTime(Message msg, log uptimeMillis)
+    public boolean sendMessageDelayed(Message msg, long delayMillis)
+
+
+첫 번째는 메시지 보낼 시간을 지정할 수 있으며, 두 번째 메시지는 일정 시간이 지난 후 실행되게 설정할 수 있다.
+ Runnable 객체를 실행하는 post() 메소드도 postAtTime() 과 postDelayed() 메소드가 있어 같은 기능을 수행한다.
+
+ 앱을 실행하고 [요청하기] 버튼을 누르면 대화상자가 나타나 [예] 버튼을 누르면 5초 뒤에 텍스트뷰에 다른 글자가 표시된다.
+
+
+            09-3 스레드로 메시지 전송하기
+
+앞서 설명한 핸들러 기능은 새로 만든 스레드에서 메인 스레드로 메시지를 전달하는 것이었다.
+이때 스레드의 작업 결과물을 메시지로 만들어 전달하는 이유는 별도의 스레드에서 메인 스레드가 관리하는
+UI 객체에 직접 접근할 수 없기 때문이라고 했다. 이와 반대로 메인 스레드에서 별도의 스레드로 메시지를 전달하는 방법이
+필요할 때가 있다. 이를 위해 스레드에서 변수를 선언하고 별도 스레드가 그 값을 읽어가는 방법을 사용할 수도 있다.
+하지만 별도의 스레드가 관리하는 동일한 객체를 여러 스레드가 접근할 때 별도의 스레드 안의 메시지 큐를 이용해
+순서대로 접근하게 해야 한다.
+
+
+                    핸들러
+                      ↑ 루퍼(Looper)
+                      □
+                      □
+                      □
+    스레드 #1  →   메시지 큐
+                 (Message Queue)
+
+
+핸들러가 처리하는 메시지 큐는 루퍼(Looper)로 처리되는데 그 과정은 일반적인 이벤트 처리과정과 유사하다.
+루퍼는 메시지 큐에 들어오는 메시지를 지속적으로 보면서 하나씩 처리하게 된다.
+메인 스레드는 UI 객체들을 처리하기 위해 메시지 큐와 루퍼를 사용한다. 근데 별도의 스레드를 만들었을 때는
+루퍼가 없다. 그래서 메인 스레드나 다른 스레드에서 메시지 전송 방식으로 스레드에 데이터를 전달한 후 순차적으로
+작업을 수행하고 싶으면 루퍼를 만들어 실행해야 한다.
+
+이제 버튼을 누르면 메인 스레드에서 새로 스레드를 만들어 메시지를 하나 전달하면 그 메시지를 화면에 보여주는 기능을 만든다.
+sample_looper.xml 파일을 만들어 텍스트뷰와 [스레드로 보내기] 버튼을 만든다.
+
+
+    public class LooperActivity extends AppCompatActivity {
+        EditText editText;
+        TextView textView;
+
+        Handler handler = new Handler();
+
+        ProcessThread thread;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_looper);
+
+            editText = findViewById(R.id.editTextTextPersonName14);
+            textView = findViewById(R.id.textView46);
+
+            Button button = findViewById(R.id.button93);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    String input = editText.getText().toString();
+                    Message message = Message.obtain();
+                    message.obj = input;
+
+                    thread.processHandler.sendMessage(message); // 새로 만든 스레드의 핸들러에 전송
+                }
+            });
+
+            thread = new ProcessThread();
+        }
+
+        class ProcessThread extends Thread {
+
+            ProcessHandler processHandler = new ProcessHandler();
+
+            public void run() {
+                Looper.prepare();
+                Looper.loop();
+            }
+
+            class ProcessHandler extends Handler {
+
+                public void handleMessage(Message msg) {
+                    final String output = msg.obj + " from thread"; // 새로 만든 스레드에게 전달받은 메시지 처리
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            textView.setText(output);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+
+코드 입력 시 Handler 와 Message 는 android.os 패키지를 선택한다.
+이 앱의 입력 상자에 글자를 넣고 누르면 메시지에 "from thread." 란 문자열을 덧붙여 텍스트뷰에 보여주게 된다.
+실행 결과만 보면 아주 간단한 기능 같겠지만 내부적으로는 메인 스레드에서 새로 만든 별도의 스레드로
+Message 객체를 전송하고, 별도 스레드에선 전달받은 문자열에 다른 문자열을 덧 부여 메인 스레드에 다시 전송하는 과정을 거친다.
+
+onCreate() 메소드에서 클릭 시 Message 객체에 문자열을 포함하여 전송하기 위해 obj 변수에 문자열을 할당한다.
+새로 정의한 ProcessThread 는 Thread 를 상속하고 그 안에 ProcessHandler 객체를 만든다.
+
+Message 객체는 Message.obtain() 메소드를 이용하여 참조할 수 있고, 새로 만든 스레드의 handler 변수로
+sendMessage() 메소드를 호출하면 메시지 객체가 스레드로 전송된다.
+ProcessThread 클래스를 정의할 때 ProcessHandler 객체를 만들어 Looper.prepare() 와 Looper.loop() 메소드를 호출하여
+이 스레드엔 Message 객체를 전달받을 수 있다.
+
+
+            09-4 AsyncTask 사용
+
+이번엔 핸들러를 사용하지 않고 좀 더 간단하게 작업해보자.
+
+AsyncTask 클래스를 상속하여 새 클래스를 만들어 그 안에 스레드를 위한 코드와 UI 접근 코드를 한번에 넣을 수 있다.
+그래서 스레드로 처리해야 하는 코드를 하나의 AsyncTask 클래스로 정의할 수 있다는 장점이 생긴다.
+예로 웹 서버에 고객 이름을 가져오는 작업과 웹 서버에서 제품 이름을 가져오는 작업을 서로 다른 코드로 분리시키고
+싶다면 두 개의 AsyncTask 상속 클래스를 만들어 각각의 코드를 넣으면 된다.
+AsyncTask 객체를 만들어 execute() 메소드를 실행하면 이 객체는 백그라운드 작업을 수행하고 필요하면
+메인 스레드에서 실행하므로 UI 객체에 접근하는데 문제가 없다.
+
+
+    메인 스레드      execute     신규 스레드
+                        ↓
+     onPreExecute
+     onProgressUpdate           doInBackground
+     onPostExecute
+
+                    AsyncTask
+
+
+AsyncTask 클래스를 상속하여 새 클래스를 정의하면 내부에 필요한 경우마다 콜백 메소드들이 자동 호출된다.
+doInBackground() 메소드엔 새로 만들어진 스레드에서 실행되어야 할 코드를 넣을 수 있다. 즉, 스레드에서 동작한다.
+하지만 onPreExecute(), onProgressUpdate(), onPostExecute() 메소드는 새로 만든 스레드가 아닌 메인 스레드에서
+실행된다. 그래서 UI 객체에 자유롭게 접근할 수 있다.
+
+
+    doInBackground      새로 만든 스레드에서 백그라운드 작업 수행. execute() 메소드 호출 시 사용된 파라미터를 배열로 전달
+    onPreExecute        백그라운드 작업을 수항 전 호출. 메인 스레드에서 실행되어 초기화 작업에 사용
+    onProgressUpdate    백그라운드 진행 상황을 표시하기 위해 사용. 작업 중간 중간 UI 객체에 접근하여 사용
+                        백그라운드 작업 중간에 publishProgress() 메소드 호출해야 함
+
+    onPostExecute       백그라운드 작업 끝난 후 호출. 작업 결과는 Result 타입 파라미터 전달
+
+
+AsyncTask 객체의 cancel() 메소드를 호출하면 작업을 취소하는데, 이 메소드로 작업 취소했을 때는 onCancelled() 가 호출된다.
+작업 진행 상황 확인 시 AsyncTask 객체의 getStatus() 메소드를 사용할 수 있다. 이 메소드를 호출했을 때는
+반환되는 AsyncTask.Status 객체는 상태를 표현하고 있으며, 각 상태는 PREDING, RUNNING, FINISHED 으로 구분된다.
+
+sample_asynctask.xml 파일을 만들어 프로그레스바와 그 아래 [실행], [취소] 버튼을 두 개 추가한다.
+
+별도의 스레드에서 프로그레스바를 1 씩 증가시키도록 하였다.
+
+
+    public class AsyncTaskActivity extends AppCompatActivity {
+        BackgroundTask task;
+        int value;
+
+        ProgressBar progressBar;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_asynctask);
+
+            progressBar = findViewById(R.id.progressBar3);
+
+            Button button = findViewById(R.id.button94);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    task = new BackgroundTask();
+                    task.execute();
+                }
+            });
+
+            Button button2 = findViewById(R.id.button95);
+            button2.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    task.cancel(true);
+                }
+            });
+        }
+
+        class BackgroundTask extends AsyncTask<Integer, Integer, Integer> {
+
+            @Override
+            protected void onPreExecute() {
+                value = 0;
+                progressBar.setProgress(value);
+            }
+
+            @Override
+            protected Integer doInBackground(Integer... integers) {
+                while (isCancelled() == false) {
+                    value++;
+                    if (value >= 100) {
+                        break;
+                    } else {
+                        publishProgress(value);
+                    }
+
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ex) {}
+                }
+
+                return value;
+            }
+
+            @Override
+            protected void onProgressUpdate(Integer... values) {
+                progressBar.setProgress(values[0].intValue());
+            }
+
+            @Override
+            protected void onPostExecute(Integer integer) {
+                progressBar.setProgress(0);
+            }
+
+            @Override
+            protected void onCancelled() {
+                progressBar.setProgress(0);
+            }
+        }
+    }
+
+
+백그라운드 작업 수행할 클래스는 BackgroundTask 란 이름의 클래스로 정의하고 AsyncTask 클래스를 상속받는다.
+이 클래스는 추상 클래스이니 새로 정의한 클래스에선 필요한 메소드를 다시 정의하여 사용한다.
+그런데 AsyncTask 클래스를 상속하는 코드엔 제네릭을 통해 자료형의 파라미터를 지정한다.
+제네릭에 명시된 자료형은 순서대로 각각 doInBackground(), onProgressUpdate(), onPostExecute() 로 결정된다.
+
+doInBackground() 메소드는 주된 작업을 실행한다.
+중간중간 진행 상태를 UI 에 업데이트하도록 만들기 위해 publishProgress() 를 호출한다.
+onProgressUpdate() 메소드는 doInBackground() 메소드에서 publishProgress() 메소드가 호출될 때마다 자동으로 호출된다.
+
+
+            09-5 스레드로 애니메이션 만들기
+
+여러 이미지를 연속으로 바꾸는 애니메이션 효과는 스레드로 사용한 경우가 많다.
+특히 자바에서 게임 등에 사용하는 애니메이션 효과는 스레드를 사용한다.
+
+이번엔 스레드로 간단한 애니메이션을 만들어보자. sample_thread_animation.xml 파일을 만들어
+이미지뷰를 하나 추가하고 [시작] 버튼을 추가한다.
+
+그리고 메인 액티비티를 다음과 같이 작성한다.
+
+
+    public class ThreadAnimationActivity extends AppCompatActivity {
+        ImageView imageView;
+
+        ArrayList<Drawable> drawableList = new ArrayList<>();
+        Handler handler = new Handler();
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_thread_animation);
+
+            Resources res = getResources();
+            drawableList.add(res.getDrawable(R.drawable.aa));
+            drawableList.add(res.getDrawable(R.drawable.asdasd));
+            drawableList.add(res.getDrawable(R.drawable.aaaaaaa));
+
+            imageView = findViewById(R.id.imageView10);
+            Button button = findViewById(R.id.button96);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    AnimThread thread = new AnimThread();
+                    thread.start();
+                }
+            });
+        }
+
+        class AnimThread extends Thread {
+            public void run() {
+                int index = 0;
+                for (int i = 0; i < 100; i++) {
+                    final Drawable drawable = drawableList.get(index);
+                    index += 1;
+                    if (index > 3) {
+                        index = 0;
+                    }
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            imageView.setImageDrawable(drawable);
+                        }
+                    });
+
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
+
+
+이미지를 사용해 애니메이션을 구현한 스레드는 AnimThread 로 정의되어 있다.
+여러 이미지를 번갈아 화면에 보여주는데 미리 Drawable 객체로 만든 이미지뷰를 설정한다.

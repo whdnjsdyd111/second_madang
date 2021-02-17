@@ -1,0 +1,854 @@
+            10-1 네트워킹
+
+네트워킹은 인터넷에 연결되어 원격지의 서버 또는 단말과 통신ㄴ하여 데이터를 주고받는 동작을 말한다.
+
+
+        네트워크 연결 방식 이해
+
+원격지 서버를 연결하는 단순 방식은 클라이언트와 서버가 일대일 연결하는 '2-tier C/S(-Client/Server)' 방식이다.
+
+
+                요청
+                -->
+    클라이언트            서버
+                <--
+                응답
+
+
+이 방식은 가장 많이 사용하는 네트워킹 방식이며 대부분 클라이언트가 서버에 연결되어 데이터를 요청하고
+응답받는 단순한 개념이다. 웹페이지를 볼 때 사용하는 HTTP 프로토콜, 파일 전송을 위한 FTP 프로토콜 그리고
+메일 주고받는 POP3 프로토콜 등은 모두 위 방법으로 접속하여 처리한다.
+
+
+                요청              데이터 요청
+                -->                 -->
+    클라이언트            응용 서버          데이터 서버
+                <--                 <--
+                응답                데이터 응답
+
+
+3-tier 연결 방식을 사용하면 서버를 좀 더 유연히 구성할 수 있다.
+또 응용 서버와 데이터 서버로 서버를 구성하면 데이터베이스를 분리하여 중간에 비즈니스 로직을 처리할 수 있다.
+이것은 N-tier 연결 방식이 있지만 일반적으로 3-tier 까지만 이해하면 된다.
+
+단말간 통신이 일반화되어 클라이언트와 서버 관계는 피어-투-피어(Peer-to-Peer) 통신으로 불리는 P2P 모델로도
+변형되어 사용되기도 한다. 이는 서버를 두지 않고 단말끼리 서버와 클라이언트 역할을한다.
+
+
+            10-2 소켓 사용하기
+
+네트워킹을 이해하려면 먼저 TCP/IP 수준의 통신 방식을 제공하는 소켓이 뭔지 알아야 한다.
+IP 주소로 목적지 호스트를 찾고 포트로 통신 접속점을 찾는 소켓 연결은 TCP 와 UDP 방식으로 나눌 수 있다.
+일반적으로 TCP 방식을 사용한다.
+
+
+        HTTP 프로토콜과 소켓
+
+HTTP 프로토콜은 소켓으로 웹서버에 연결한 후 요청을 전송하고 응답받은 다음 연결을 끊는다.
+이런 특성을 '비연결성' 이라 하는데 이런 특성 때문에 실시간으로 데이터를 처리하는 앱은 응답 속도를 높이기 위해
+연결성 있는 소켓 연결을 선호했다. 지금은 인터넷 속도가 빨라져 HTTP 프로토콜을 사용하는 웹이 일반적이고
+속도도 느리지 않아 표준을 따를 수 있는 장점까지 가진 웹서버가 많이 만들어지게 된다.
+
+안드로이드는 표준 자바에서 사용한 java.net 패키지의 클래스를 그대로 사용할 수 있어서
+네트워킹의 기본인 소켓 연결은 아주 쉽다.
+
+네트워킹 실습을 위해 소켓 연결과 스레드 처리 등을 알아보자.
+먼저 sample_socket.xml 파일을 만들어 두 리니어 레이아웃을 만들어 전송 메시지를 전송할 리니어와
+서버 시작을 할 리니어 둘로 나뉘어 생성한다.
+
+[서버 시작] 버튼을 누르면 startServer() 로 서버를 시작하고 [전송] 버튼을 누르면 send() 메소드로
+네트워킹 기능을 완성시킨다.
+
+
+    public class SocketActivity extends AppCompatActivity {
+        EditText editText;
+
+        TextView textView;
+        TextView textView2;
+
+        Handler handler = new Handler();
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_socket);
+
+            editText = findViewById(R.id.editTextTextPersonName14);
+            textView = findViewById(R.id.textView47);
+            textView2 = findViewById(R.id.textView48);
+
+            Button button = findViewById(R.id.button97);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final String data = editText.getText().toString();
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            send(data);
+                        }
+                    }).start();
+                }
+            });
+
+            Button  button2 = findViewById(R.id.button98);
+            button2.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            startServer();
+                        }
+                    }).start();
+                }
+            });
+        }
+    }
+
+
+두 텍스트뷰는 결과를 화면에 출력하기 위함이고 printClientLog() 메소드로 화면 상단에 텍스트 뷰에 글자를
+출력하고 printServerLog() 메소드로는 화면 하단에 텍스트뷰 글자를 출력한다.
+새 스레드는 핸들러 객체를 이용한다.
+
+
+    public void printClientLog(final String data) {
+        Log.d("SocketActivity", data);
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                textView.append(data + "\n");
+            }
+        });
+    }
+
+    public  void printServerLog(final String data) {
+        Log.d("SocketActivity", data);
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                textView2.append(data + "\n");
+            }
+        });
+    }
+
+
+printClientLog() 와 printServerLog() 메소드 안에 핸들러 객체로 Runnable 객체를 통해 텍스트뷰에 접근한다.
+텍스트뷰의 append() 메소드로 텍스트뷰에 덧붙여 출력한다.
+
+이제 클라이언트에서 데이터를 전송하는 send() 메소드를 정의한다. 여기선 5001 포트를 이용한다.
+
+
+    public void send(String data) {
+        try {
+            int portNumber = 5001;
+            Socket sock = new Socket("localhost", portNumber);
+            printClientLog("소켓 연결함.");
+
+            ObjectOutputStream outstream = new ObjectOutputStream(sock.getOutputStream());
+            outstream.writeObject(data);
+            outstream.flush();
+            printClientLog("데이터 전송함");
+
+            ObjectInputStream instream = new ObjectInputStream(sock.getInputStream());
+            printClientLog("서버로부터 받음 : " + instream.readObject());
+            sock.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+표준 자바의 소켓 클라이언트 코드와 같다. 접속할 IP 주소는 "localhost", 포트는 5001 번을 사용하고 있다.
+소켓으로 데이터를 보내거나 받을 때 getOutputStream() 과 getInputStream() 메소드로 입출력 스트림 객체를 참조한다.
+
+이 클라이언트가 접속할 서버는 startServer() 메소드로 구성한다.
+
+
+    public void startServer() {
+        try {
+            int portNumber = 5001;
+
+            ServerSocket server = new ServerSocket(portNumber);
+            printServerLog("서버 시작함: " + portNumber);
+
+            while (true) {
+                Socket sock = server.accept();
+                InetAddress clientHost = sock.getLocalAddress();
+                int clientPort = sock.getPort();
+                printServerLog("클라이언트 연결됨: " + clientHost + " : " + clientPort);
+
+                ObjectInputStream instream = new ObjectInputStream(sock.getInputStream());
+                Object obj = instream.readObject();
+                printServerLog("데이터 받음 : " + obj);
+
+                ObjectOutputStream outstream = new ObjectOutputStream(sock.getOutputStream());
+                outstream.writeObject(obj + "from Server.");
+                outstream.flush();
+                printServerLog("데이터 보냄");
+
+                sock.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+소켓 서버는 ServerSocket 클래스로 만든 후, 클라이언트로부터의 요청을 처리할 수 있는데
+포트 5001 번호를 그대로 사용한다. while 구문으로 접속을 계속 기다리다가 클라이언트 접속 요청이 오면
+accept() 메소드를 통해 소켓 객체가 반환되므로 클라이언트 소켓 연결 정보를 확인할 수 있다.
+
+마지막으로 매니페스트 파일에서 INTERNET 권한을 추가한다.
+
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+
+앱을 실행하고 확인해보자.
+
+
+    조언
+
+    실제 앱 만들 때는 Object 입출력 스트림을 사용하면 잘 이루어지지 않을 수 있기 때문에
+    일반적으로 Data 입출력 스트림을 사용한다.
+
+
+            10-3 웹으로 요청하기
+
+비연결성인 HTTP 프로토콜은 페이지 정보를 요청할 때마다 소켓을 새로 연결하고 응답받는 다음 끊는 것이 일반적이다.
+그리고 그 소켓 연결 위에서 HTTP 프로토콜에 맞는 요청을 보내고 응답을 받아 처리한다.
+
+
+        HTTP 웹 서버에 접속
+
+HTTP 로 웹 서버에 접속하는 것도 소켓과 마찬가지이다.
+가장 간단한 방법은 URL 객체를 만들어 이 객체에 openConnection() 메소드를 호출하여 HttpURLConnection 객체를
+만드는 것이다.
+
+
+    public URLConnection openConnection()
+
+
+URL 객체에 들은 문자열이 "http://" 를 포함하면 HTTP 연결을 위한 객체를 만드므로 openConnection() 메소드가 리턴하는
+URLConnection 객체를 HttpURLConnection 으로 형변환하여 사용할 수 있다.
+HttpConnection 객체로 연결할 경우엔 GET 이나 POST 와 같은 요청 방식과 함께 요청을 위한 파라미터들을 설정할 수 있다.
+
+
+    public void setRequestMethod(String method)
+    public void setRequestProperty(String field, String newValue)
+
+
+요청 방식을 지정하는 메소드는 setRequestMethod() 로 GET 이나 POST 를 전달한다.
+setRequestProperty() 메소드는 요청할 때 헤더에 들어갈 필드값을 지정할 수 있다.
+
+sample_http.xml 를 만들고 최상위에 입력상자와 버튼 그리고 하단에 텍스트뷰를 추가한다.
+그리고 메인 액티비티를 다음과 같이 작성한다.
+
+
+    public class HttpActivity extends AppCompatActivity {
+        EditText editText;
+        TextView textView;
+
+        Handler handler = new Handler();
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_http);
+
+            editText = findViewById(R.id.editTextTextPersonName17);
+            textView = findViewById(R.id.textView49);
+
+            Button button = findViewById(R.id.button99);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final String urlStr = editText.getText().toString();
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            request(urlStr);
+                        }
+                    }).start();
+                }
+            });
+        }
+    }
+
+
+버튼을 누르면 사용자가 입력한 주소를 이용해 request() 메소드를 호출하여
+인터넷을 사용하여 데이터를 얻는다. request() 메소드는 다음과 같이 작성한다.
+
+
+    public void request(String urlStr) {
+        StringBuilder output = new StringBuilder();
+        try {
+            URL url = new URL(urlStr);
+
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            if (conn != null) {
+                conn.setConnectTimeout(10000);
+                conn.setRequestMethod("GET");
+                conn.setDoInput(true);
+
+                int resCode = conn.getResponseCode();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                String line = null;
+                while (true) {
+                    line = reader.readLine();
+                    if (line == null) {
+                        break;
+                    }
+
+                    output.append(line + "\n");
+                }
+                reader.close();
+                conn.disconnect();
+            }
+        } catch (Exception e) {
+            println("예외 발생함 : " + e.toString());
+        }
+
+        println("응답 -> " + output.toString());
+    }
+
+    public void println(final String data) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                textView.append(data + "\n");
+            }
+        });
+    }
+
+
+request() 메소드로 응답 결과물을 모아 출력한다. URL 객체를 만들고 이 openConnection() 메소드로
+HttpURLConnection 객체가 반환된다.
+이 객체에 GET 방식을 요청하여 setRequestMethod 메[소드로 getResponseCode() 메소드를 호출하면
+내부적으로 웹 서버에 페이지를 요청하는 과정을 수행하게 된다.
+setConnectTimeout() 메소드는 연결 대기 시간을 설정하는 것으로 10초 동안 가다린다.
+setDoInput() 메소드는 이 객체의 입력이 가능하게 만들어 준다. 응답 코드가 HTTP_OK 인 경우
+정상 응답이 온거니 문자열로 변환하여 반환한다. 스트림에서 한 줄식 읽어 들이는 메소드인
+readLine() 은 BufferedReader 클래스에 정의되어 있으니 HttpURLConnection 객체의 스트림을 이 클래스의 객체로
+만든 후 처리한다.
+
+앱을 실행하고 다음 주소로 예제를 실행해보자.
+
+
+    http://www.kobis.or.kr/kobisopenapi/webservice/rest/boxoffice/searchDailyBoxOfficeList.json
+        ?key=f5eef3421c602c6cb7ea224104795888&targetDt=20120101
+
+
+영화 정보를 받아오는 오픈 소스 중 하나로 단순 테스트용이다.
+이렇게 요청 결과가 json 객체로 나타나는 것을 볼 수 있다.
+
+
+            10-4 Volley 사용
+
+웹서버에 요청 후 응답 받을 때 HttpURLConnection 객체를 사용할 수 있지만 요청과 응답의 코드가 많다.
+그리고 스레드를 사용하면서 넣어야 하는 코드 양도 많다. 핸들러에 대한 이해가 없다면 앱이 비정상 종료가 될 수 있다.
+이 문제를 해결하기 위한 라이브러리 중 하나로 Volley 가 있다.
+Volley 라이브러리는 웹 요청과 응답을 단순화한 라이브러리이다.
+
+Volley 를 사용하려면 먼저 요청 객체를 만들고 이 요청 객체를 요청 큐에 넣어주면 된다.
+그럼 요청 큐가 알아서 웹서버에 요청하고 응답까지 받아준다.
+우린 응답 받을 수 있게 지정된 메소드를 만들어두기만하면 응답이 왔을 때 메소드가 자동 호출된다.
+
+
+                                                                    요쳥
+    Request                추가                       Thread1        -->
+                            -->     RequestQueue      Thread2                   Server
+    ResponseListener                                  Thread3       <--
+                                                                    응답
+        ↓
+     응답 처리
+
+
+Volley 라이브러리의 가장 큰 장점은 스레드를 신경쓰지 않아도 된다는 점이다.
+요청 큐가 내부에서 스레드를 만들어 웹 서버에 요청하고 응답받는 과정을 진행하는데,
+응답을 처리할 수 있는 메소드를 호출할 때는 메인 스레드에서 처리할 수 있도록 만들기 때문이다.
+그래서 스레드를 사용할 필요도 없고 화면의 결과에 표시할 때는 핸들러를 사용할 필요도 없다.
+
+Volley 를 사용하여 웹 요청과 응답을 처리하는 과정을 보자.
+실습을 위해 sample_request.xml 을 만든다. 그리고 그래들에 volley 를 추가한다.
+
+
+    implementation 'com.android.volley:volley:1.1.0'
+
+
+인터넷을 사용하니 권한과 usesCleartextTraffic 속성을 추가하는 것을 잊으면 안된다.
+이전 소켓 레이아웃과 동일하게 입력상자, 버튼, 텍스트뷰를 추가한다.
+그리고 메인 액티비티는 다음과 같이 작성한다.
+
+
+    public class RequestActivity extends AppCompatActivity {
+        EditText editText;
+        TextView textView;
+
+        static RequestQueue requestQueue;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_request);
+
+            editText =findViewById(R.id.editTextTextPersonName18);
+            textView = findViewById(R.id.textView50);
+
+            Button button = findViewById(R.id.button100);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    makeRequest();
+                }
+            });
+
+            if (requestQueue == null) {
+                requestQueue = Volley.newRequestQueue(getApplicationContext());
+            }
+        }
+
+        public void makeRequest() {
+            String url = editText.getText().toString();
+
+            StringRequest request = new StringRequest(Request.Method.GET, url,
+                    new Response.Listener<String>() {
+                        @Override
+                        public void onResponse(String response) {
+                            println("응답 -> " + response);
+                        }
+                    },
+                    new Response.ErrorListener() {
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+                            println("에러 -> " + error.getMessage());
+                        }
+                    }) {
+                @Override
+                protected Map<String, String> getParams() throws AuthFailureError {
+                    Map<String, String> params = new HashMap<>();
+
+                    return params;
+                }
+            };
+
+            request.setShouldCache(false);
+            requestQueue.add(request);
+            println("요청 보냄.");
+        }
+
+        public void println(String data) {
+            textView.append(data + "\n");
+        }
+    }
+
+
+사용자가 버튼을 클릭하면 요청 객체를 만들어 요청 큐에 넣게 된다. 요청 큐는 한번 만 만들어 계속 사용할 수 있어
+static 키워드로 할당하였다. 이렇게 앱 전체에서 사용하는 것이 일반적이다.
+실제 앱을 만들 때는 Application 클래스 안에 넣어두거나 별도의 클래스를 만들어 넣어둘 수 있다.
+요청 큐를 만들 때는 Volley.newRequestQueue() 메소드를 사용할 수 있어 onCreate() 메소드 안에 넣어둔다.
+
+요청 객체를 StringRequest 클래스로 만들 수 있다. StringRequest 는 문자열을 주고받기 위해 사용할 객체이며
+Volley 라이브러리 안에 여러 유형의 요청 객체가 들어있는데 일반적으로 StringRequest 객체만으로 충분하다.
+
+요청 객체는 new 연산자로 만들때는 네 개의 파라미터를 전달할 수 있다.
+첫 번째는 GET() 또는 POST() 메소드를 전달하여 요청 방식을 지정하는 것이다.
+두 번째 파라미터로 웹 사이트 주소를 전달한다.
+세 번째 파라미터로는 응답받을 리스너 객체를 전달한다. 이 리스너의 onResponse() 메소드는 응답 받았을 때 자동 호출된다.
+네 번째 파라미터로는 에러가 발생했을 때의 리스너를 전달한다.
+
+여기선 GET 방식을 이용 했지만 POST 방식을 사용하면서 요청 파라미터를 전달하고자하면 getParams() 메소드에서
+반환하는 HashMap 객체에 파라미터 값들을 넣어주면 된다. 여기선 파라미터가 없기 때문에 비웠다.
+
+요청 객체를 만들었다면 이 객체는 요청 큐에 넣어주면 된다. 요청 큐의 add() 메소드로 요청 객체를 넣으면
+자동으로 요청 응답을 진행한다. 이는 cache 매커니즘을 지원하여 응답 결과를 사용하지 않겠다면
+setShouldCache() 메소드로 사용하지 않을 수 있다.
+
+
+            10-5 JSON 데이터 다루기
+
+JSON 은 자바스크립트 객체 포맷 데이터이며 키 밸루로 이루어져있다.
+
+이전 실습들도 JSON 데이터들이다. 이제 이를 처리하는 방법을 알아보자.
+Gson 은 자바스크립트처럼 JSON 객체로 변환할 수 있도록 해 준다.
+즉 JSON 문자열이 자바 객체로 만들어질 수 있다. Volley 를 사용하여 웹으로부터 JSON 을받아 이를 객체로 바꾸어
+데이터에 접근할 수 있다.
+
+
+    Request
+
+    ResponseListener
+        ↓ 응답 처리
+    Gson parse      --->    Java Object
+
+
+Gson 도 Volley 처럼 외부 라이브러리이기 때문에 추가해야 한다.
+
+
+    implementation 'com.google.code.gson:gson:2.8.6'
+
+
+Gson 은 JSON 문자열을 자바 객체로 바꿔주는데 자바는 객체를 만들 때 클래스를 먼저 정의하는 과정을 거치니
+JSON 문자열을 자바 객체로 바꿀때도 클래스를 먼저 정의해야 한다.
+
+영화 정보 JSON 응답의 포맷에 맞추어 새 자바 클래스를 정의한다.
+MovieList 클래스를 먼저 정의한다. 그리고 추 후에 추가할 MovieListResult 클래스를 선언해 놓는다.
+
+
+    public class MovieList {
+        MovieListResult boxOfficeResult;
+    }
+
+
+응답 데이터 가장 바깥이 중괄호이니 이 객체를 변환할 클래스로 MovieList 로 정의한다.
+그리고 MovieListResult 를 boxOfficeResult 변수로 선언해 놓는다. 여기서 변수 이름은 JSON 문자열의 속성 이름과
+같아야 한다. 그리고 자료형도 같아야 한다. JSON 문자열에서 boxOfficeResult 속성의 값이 객체이니
+이 객체를 변환하여 담아둘 클래스를 MovieListResult 란 이름으로 추가한다.
+
+
+    public class MovieListResult {
+
+        String boxOfficeType;
+        String showRange;
+
+        ArrayList<Movie> dailyBoxOfficeList = new ArrayList<>();
+    }
+
+
+JSON 문자열의 속성 중 값이 배열일 경우, 즉 대괄호 표시된 경우엔 클래스를 정의 시 ArrayList 자료형을 사용할 수 있다.
+그리고 그 배열 안에 다시 객체들이 들어갈 경우 해당 객체들을 위한 클래스를 추가로 만들어야 한다.
+이 클래스는 ArrayList 의 제네릭 타입으로 지정된다. 그리고 이 배열 안에 들어갈 Movie 객체도 정의한다.
+
+
+    public class Movie {
+
+        String rnum;
+        String rank;
+        String rankInten;
+        String rankOldAndNew;
+        String movieCd;
+        String movieNm;
+        String openDt;
+        String salesAmt;
+        String salesShare;
+        String salesInten;
+        String salesChange;
+        String salesAcc;
+        String audiCnt;
+        String audiInten;
+        String audiChange;
+        String audiAcc;
+        String scrnCnt;
+        String showCnt;
+    }
+
+
+세 클래스들을 만들어졌다. 이렇게 JSON 문자열의 포맷에 맞게 만들어야 한다.
+그럼 이제 RequestActivity 자바 파일에서 onResponse() 메소드 그 아래에 processResponse() 메소드를 작성한다.
+
+
+    @Override
+    public void onResponse(String response) {
+        println("응답 -> " + response);
+
+        processResponse(response);
+    }
+
+    public void processResponse(String response) {
+        Gson gson = new Gson();
+        MovieList movieList = gson.fromJson(response, MovieList.class);
+        println("영화 정보 수 : " + movieList.boxOfficeResult.dailyBoxOfficeList.size());
+    }
+
+
+위 메소드를 동해 영화 정보 개수를 확인할 수 있다.
+
+
+            10-6 영화 정보 가져와 보여주기
+
+앞서 코드들과 리싸이클뷰를 합쳐 영화 정보를 가져와서 리스트를 보여주는 것이 가능하다.
+먼저 리싸이클뷰를 만드는 과정을 따라본다. sample_movie.xml 파일을 만들어 이전과 같은 디자인에
+텍스트뷰 대신 리싸이클뷰를 추가한다.
+
+그리고 입력상자에서 영화정보르 가져올 URL 을 미리 넣어둔다.
+XML 레이아웃에선 & 을 인식 못하기 때문에 &#38; 로 바꾼다.
+
+리싸이클뷰는 선택 위젯이기 때문에 어댑터가 데이터 관리와 뷰 객체를 관리 담당한다.
+여기선 영화 정보를 받아 각 정보를 Movie 객체로 만들어 보여준다.
+어댑터를 새로운 자바 클래스로 만든다. 이름은 MovieAdapter 로 하여 작성한다.
+
+
+    public class MovieAdapter {
+
+        static class ViewHolder extends RecyclerView.ViewHolder {
+            TextView textView;
+            TextView textView2;
+
+            public ViewHolder(View itemView) {
+                super(itemView);
+
+                textView = itemView.findViewById(R.id.textView51);
+                textView2 = itemView.findViewById(R.id.textView52);
+            }
+
+            public void setItem(Movie item) {
+                textView.setText(item.movieNm);
+                textView2.setText(item.audiCnt + "명");
+            }
+        }
+    }
+
+
+리스트 형태로 보일 때 각 아이템은 뷰로 만들어지며 이 각각의 아이템을 위한 뷰는 뷰홀더에 담아 두게 된다.
+이 뷰홀더 안에 Movie 객체를 담아 setItem() 으로 전달한다.
+그리고 첫 번째 텍스트뷰는 영화 이름, 두 번째 텍스트뷰엔 관객 수를 표시한다.
+영화 이름은 movieNm 이란 변수, 관객 수는 audiCnt 변수 이름으로 되어 있다.
+이제 리싸이클뷰를 만들 때 사용한 person_item.xml 과 비슷하게 movie_item.xml 을 만든다.
+
+
+    <?xml version="1.0" encoding="utf-8"?>
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="8dp"
+            android:layout_marginRight="8dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="4dp"
+            app:cardBackgroundColor="#ffffffff"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="5dp" >
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/imageView11"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:padding="5dp"
+                    android:src="@drawable/ic_menu_camera" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_margin="5dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical" >
+
+                    <TextView
+                        android:id="@+id/textView51"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="제목"
+                        android:textSize="22sp"
+                        android:maxLines="1" />
+
+                    <TextView
+                        android:id="@+id/textView52"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingRight="10dp"
+                        android:gravity="right"
+                        android:text="관객 수"
+                        android:textColor="#ff0000ff"
+                        android:textSize="16sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+    </LinearLayout>
+
+
+이제 메인 MovieAdapter 에서 RecyclerView.Adapter 클래스를 상속하도록 수정한다.
+
+
+    public class MovieAdapter extends RecyclerView.Adapter<MovieAdapter.ViewHolder> {
+
+        ArrayList<Movie> items = new ArrayList<>();
+
+        @NonNull
+        @Override
+        public ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int viewType) {
+            LayoutInflater inflater = LayoutInflater.from(viewGroup.getContext());
+            View itemView = inflater.inflate(R.layout.movie_item, viewGroup, false);
+
+            return new ViewHolder(itemView);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+            Movie item = items.get(position);
+            holder.setItem(item);
+        }
+
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+
+        public void addItem(Movie item) {
+            items.add(item);
+        }
+
+        public void setItems(ArrayList<Movie> items) {
+            this.items = items;
+        }
+
+        public Movie getItems(int position) {
+            return items.get(position);
+        }
+
+
+뷰홀더가 만들어진 시점인 onCreateViewHolder() 메소드 안에 movie_item.xml 파일을 인플레이션한 뒤
+뷰홀더를 만들고 그 안에 넣어 반환한다. onBindViewHolder() 메소드 안에선 현재 인덱스에 맞는 Movie 객체를 찾아
+뷰홀더 객체를 설정했다.
+
+이제 리싸이클뷰를 위한 코드를 만들었으니 이제 메인 액티비티에서 어댑터를 설정한다.
+
+
+    public class MovieActivity extends AppCompatActivity {
+        EditText editText;
+        TextView textView;
+
+        RecyclerView recyclerView;
+        MovieAdapter adapter;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_movie);
+
+            editText = findViewById(R.id.editTextTextPersonName19);
+            textView = findViewById(R.id.textView52);
+
+            recyclerView = findViewById(R.id.recyclerView2);
+
+            LinearLayoutManager layoutManager = new LinearLayoutManager(this,
+                    LinearLayoutManager.VERTICAL, false);
+            recyclerView.setLayoutManager(layoutManager);
+
+            adapter = new MovieAdapter();
+            recyclerView.setAdapter(adapter);
+        }
+    }
+
+
+리싸이클뷰엔 세로 방향으로 리스트를 볼 수 있게 레이아웃 매니저를 설정했다.
+그 아래 MovieAdapter 객체를 만들어 setAdapter() 메소드를 호출하여 설정했다.
+
+버튼을 누르면 사이트 주소로 웹 요청을 할 수 있도록 메인 액티비티 파일을 수정한다.
+먼저 onCreate() 메소드 안에 버튼과 리스너를 추가하고 Volley 의 RequestQueue 객체를 생성하여
+makeRequest(), println(), processResponse() 메소드를 순서대로 정의한다.
+
+
+    public class MovieActivity extends AppCompatActivity {
+        EditText editText;
+        TextView textView;
+
+        RecyclerView recyclerView;
+        MovieAdapter adapter;
+
+        static RequestQueue requestQueue;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_movie);
+
+            editText = findViewById(R.id.editTextTextPersonName19);
+            textView = findViewById(R.id.textView52);
+
+            recyclerView = findViewById(R.id.recyclerView2);
+
+            LinearLayoutManager layoutManager = new LinearLayoutManager(this,
+                    LinearLayoutManager.VERTICAL, false);
+            recyclerView.setLayoutManager(layoutManager);
+
+            adapter = new MovieAdapter();
+            recyclerView.setAdapter(adapter);
+
+            Button button = findViewById(R.id.button101);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    makeRequest();
+                }
+            });
+
+            if (requestQueue == null) {
+                requestQueue = Volley.newRequestQueue(getApplicationContext());
+            }
+        }
+
+        public void makeRequest() {
+            String url = editText.getText().toString();
+
+            StringRequest request = new StringRequest(
+                    Request.Method.GET,
+                    url,
+                    new Response.Listener<String>() {
+                        @Override
+                        public void onResponse(String response) {
+                            println("응답 -> " + response);
+
+                            processResponse(response);
+                        }
+                    },
+                    new Response.ErrorListener() {
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+                            println("에러 -> " + error.getMessage());
+                        }
+                    }) {
+                @Override
+                protected Map<String, String> getParams() throws AuthFailureError {
+                    Map<String, String> params = new HashMap<>();
+
+                    return params;
+                }
+            };
+
+            request.setShouldCache(false);
+            requestQueue.add(request);
+            println("요청 보냄.");
+        }
+
+        public void println(String data) {
+            textView.append(data + "\n");
+        }
+
+        public void processResponse(String response) {
+            Gson gson = new Gson();
+            MovieList movieList = gson.fromJson(response, MovieList.class);
+            println("영화 정보 수 : " + movieList.boxOfficeResult.dailyBoxOfficeList.size());
+
+            for (int i = 0; i < movieList.boxOfficeResult.dailyBoxOfficeList.size(); i++) {
+                Movie movie = movieList.boxOfficeResult.dailyBoxOfficeList.get(i);
+
+                adapter.addItem(movie);
+            }
+
+            adapter.notifyDataSetChanged();
+        }
+    }
+
+
+앱을 실행하고 확인해보자.
+
+만약 각 아이템 왼쪽 이미지에 영화 이미지로 바꾸고 싶다면 웹서버에 이미지를 받아와 표시해야 한다.
+이미지를 다운로드하여 표시할 때 직접 이미지 파일을 다운받는 방법도 있지만 라이브러리를 활용하는 경우가 더 많다.
+이는 한번 받아온 이미지를 임시 저장하여 보여주는 기능 등 장점이 많기 때문이다.
+자주 사용하는 이미지 다운로드 라이브러리로 Glide 나 Picasso 를 들 수 있다.
+이 라이브러리들로 이미지뷰에 이미지를 다운로드 받아 설정하는 과정을 한두줄 만으로 가능해지니 나중에 직접 추가해보자.

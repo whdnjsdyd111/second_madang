@@ -1,0 +1,1088 @@
+            15-1 진동과 소리
+
+안드로이드는 Vibrator 란 서비스 객체로 진동을 울릴 수 있다.
+
+
+    public void vibrate(long milliseconds)
+    public void vibrate(VibrationEffect vibe)
+
+
+vibrate() 메소드의 파라미터로 long 자료형을 통해 지속할 시간을 지정한다.
+안드로이드 26버전부터는 VibrationEffect 파라미터로 변경되었다.
+이는 Build.VERSION.SDK_INT 상수로 현재 단말 버전을 체크하는 과정이 필요하다.
+
+소리를 이용해 사용자에게 알려주는 것은 Ringtone 객체를 사용할 수 있다.
+이 객체는 API 에서 제공하는 소리를 재생할 수 있다.
+
+
+    public void play()
+
+
+Ringtone 객체의 play() 메소드로 소리를 울릴 수 있고 API 의 소리 대신 직접 음원 파일을 재생할 수도 있다.
+음원 파일은 MediaPlayer 객체로 다루어 재생할 수 있다.
+
+진동과 소리를 다루기 위해 sample_vibrate.xml 파일을 만들고 [진동 울리기], [소리 울리기], [파일로 소리 울리기] 버튼을 추가한다.
+그리고 메인 액티비티를 작성한다.
+
+
+    public class VibrateActivity extends AppCompatActivity {
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_vibrate);
+
+            Button button = findViewById(R.id.button129);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
+                    if (Build.VERSION.SDK_INT >= 26) {
+                        vibrator.vibrate(VibrationEffect.createOneShot(1000, 10));
+                    } else {
+                        vibrator.vibrate(1000);
+                    }
+                }
+            });
+
+            Button button2 = findViewById(R.id.button130);
+            button2.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+                    Ringtone ringtone = RingtoneManager.getRingtone(getApplicationContext(), uri);
+                    ringtone.play();
+                }
+            });
+
+            Button button3 = findViewById(R.id.button131);
+            button3.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    MediaPlayer player = MediaPlayer.create(getApplicationContext(), R.raw.flex);
+                    player.start();
+                }
+            });
+        }
+    }
+
+
+첫 번째 버튼은 26 부터 파라미터가 변경이 되어 버전을 먼저 확인하여 각 코드를 작성하였다.
+두 번째 버튼은 Ringtone 이 RingtoneManager.getRingtone() ㅁ[ㅔ소드로 참조하여 Uri 를 지정한 후 재생하였다.
+세 번째 버튼은 직접 지정한 음악을 재생하였다.
+
+진동 울리기는 VIBRATE 권한이 필요하니 권한을 추가한다.
+
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+
+앱을 실행하여 재생해보자.
+
+
+            15-2 상단 알림으로 알려주기
+
+알림은 상단에 정보를 표시하여 사용자에게 알려준다.
+이 알림 기능은 주로 다른 사람에게서 메시지를 받았을 때나 단말 상태를 표시할 때 사용한다.
+
+알림은 NotificationManager 시스템 서비스를 이용해 화면 상단에 띄울 수 있다.
+알림을 띄우기 위해선 Notification 객체를 만들어야 하는데 이 객체는 NotificationCompat.Builder 객체를 만든다.
+
+sample_notification.xml 을 추가하여 화면 가운데 버튼을 하나 추가하고 메인 액티비티를 작성한다.
+
+
+    public class NotificationActivity extends AppCompatActivity {
+        NotificationManager manager;
+
+        private static String CHANNEL_ID = "channel1";
+        private static String CHANNEL_NAME = "Channel1";
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_notification);
+
+            Button button = findViewById(R.id.button132);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    showNoti1();
+                }
+            });
+        }
+
+        public void showNoti1() {
+            manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            NotificationCompat.Builder builder = null;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+                    manager.createNotificationChannel(new NotificationChannel(
+                            CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT
+                    ));
+
+                    builder = new NotificationCompat.Builder(this, CHANNEL_ID);
+                }
+            } else {
+                builder = new NotificationCompat.Builder(this);
+            }
+
+            builder.setContentTitle("간단 알림");
+            builder.setContentText("알림 메시지입니다.");
+            builder.setSmallIcon(android.R.drawable.ic_menu_view);
+            Notification noti = builder.build();
+
+            manager.notify(1, noti);
+        }
+    }
+
+
+버튼 클릭 시 showNoti1() 메소드를 호출한다. 이 메소드 안에 NotificationManager 객체를 참조한 후
+NotificationCompat.Builder 객체를 생성한다. 이 때도 버전을 고려하여 코드를 작성하였다.
+
+setContentTitle 은 알림 제목, setContentText 는 알림 메시지를 설정.
+setSmallIcon() 메소드는 아이콘 설정을 한다. 이제 앱을 실행하여 메시지를 확인해보자.
+
+근데 알림을 눌러봐도 아무 반응이 없다. 이 알림은 단순 정보를 보여주기 때문에 눌렀을 때는 아무 반응이 없다.
+
+메인 액티비티를 열어서 버튼을 하나 더 추가한다. 그리고 [알림 띄우고 클릭하기] 버튼을 추가한다.
+그리고 메인 액티비티는 다음과 같이 작성한다.
+
+
+    public void showNoti2() {
+        manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+        NotificationCompat.Builder builder = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (manager.getNotificationChannel(CHANNEL_ID2) == null) {
+                manager.createNotificationChannel(new NotificationChannel(
+                        CHANNEL_ID2, CHANNEL_NAME2, NotificationManager.IMPORTANCE_DEFAULT
+                ));
+
+                builder = new NotificationCompat.Builder(this, CHANNEL_ID2);
+            }
+        } else {
+            builder = new NotificationCompat.Builder(this);
+        }
+
+        Intent intent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 101, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        builder.setContentTitle("간단 알림");
+        builder.setContentText("알림 메시지입니다.");
+        builder.setSmallIcon(android.R.drawable.ic_menu_view);
+        builder.setAutoCancel(true);
+        builder.setContentIntent(pendingIntent);
+
+        Notification noti = builder.build();
+
+        manager.notify(2, noti);
+
+        NotificationCompat.BigTextStyle style = new NotificationCompat.BigTextStyle();
+        style.bigText("많은 글자들입니다");
+        style.setBigContentTitle("제목입니다");
+        style.setSummaryText("요약 글입니다");
+
+        NotificationCompat.Builder builder2 = new NotificationCompat.Builder(this, "channel3")
+                .setContentTitle("알림 제목")
+                .setContentText("알림 내용")
+                .setSmallIcon(android.R.drawable.ic_menu_send)
+                .setStyle(style);
+
+    }
+
+
+버튼을 누르면 showNoti2() 가 호출된다.
+Builder 사용 시 setAutoCancel() 메소드와 setContentIntent() 메소드를 추가로 호출한다.
+setAutoCancel() 메소드는 알림 클릭 시 자동으로 삭제하고 setContentIntent() 메소드는 pendingIntent 객체가
+파라미터로 전달된다. 그리고 클릭 시 인텐트 객체로 액티비티를 띄운다.
+
+지금까지 알림을 살펴보았고 이미지나 많은 글을 표시하는 것은 다음과 같이 할 수 있다.
+
+
+    NotificationCompat.BigTextStyle style = new NotificationCompat.BigTextStyle();
+    style.bigText("많은 글자들입니다");
+    style.setBigContentTitle("제목입니다");
+    style.setSummaryText("요약 글입니다");
+
+    NotificationCompat.Builder builder2 = new NotificationCompat.Builder(this, "channel3")
+            .setContentTitle("알림 제목")
+            .setContentText("알림 내용")
+            .setSmallIcon(android.R.drawable.ic_menu_send)
+            .setStyle(style);
+
+
+BitTextStyle 객체를 만들어 Builder 의 setStyle() 메소드로 설정할 수 있다.
+InboxStyle 로는 여러 줄의 텍스트를 알려줄 수 있다.
+MessagingStyle 로 만든 알림은 여러 줄의 메시지와 시간을 보여줄 수 있어 카톡과 같은 메시지를 보여줄 수 있다.
+BigPicture 은 큰 이미지를 보여주고 싶을 때 사용된다.
+
+
+            15-3 푸시 서비스 사용하기
+
+
+        푸시 메시지
+
+안드로이드 스마트폰 사용 시 스토어나 마켓에서 설치한 앱의 업데이트가 있다는 메시지를 볼 수 있는데
+단말 위쪽 부분에 상태바 부분에 업데이트에 대한 메시지를 부여하여 결정할 수 있다.
+
+
+    단순 메시지 알림   -   간단하지만 비용 발생
+    앱에서 서버에 연결한 알림  -   서버와의 연결 후 폴링하는 과정이 필요하며 백그라운드 서비스로 연결 유지하여 간단하지만은 않음
+    구글 푸시 서비스(FCM) 사용   -   구글 클라우드 서버로 메시지 전송 방식을 최적화한 서비스
+
+
+이 세가지 방식으로 세 번째 방식은 처음에 C2DM(Cloud To Device Messaging)이란 이름이었지만 GCM(Google Cloud Messaging)으로
+변경되었다가 현재 FCM(Firebase Cloud Messaging)으로 다시 바뀌었다.
+
+푸시 서비스란 '업데이트가 있다' 란 메시지를 클라우드에서 보내주는 방식이다.
+근데 푸시 서비스 사용 시 구글 클라우드와 직접 연결하진 않는다. 단말에서 연결을 유지하고 있다.
+
+구글을 사용하지 않는다면 단말에서 서버와 연결을 지속적으로 유지해야 한다.
+그래서 일정 시간 간격으로 연결이 끊어졌는지 검사하는 폴링 매커니즘을 구현해야 한다.
+근데 이는 단말 하드웨어를 많이 소모하여 문제가 발생한다. 그래서 FCM 으로 효과적으로 푸시를 보내는 방법이 좋다.
+
+클라우드 서버에 단말을 등록하면 id 를 받게 된다. 그리고 푸시 메시지를 보내는 쪽에 상대방의 id 를 사용해
+메시지를 보낼 수 있다. 결국 id 가 전송 허가서 역할을 한다.
+
+
+    1 단말은 자신을 클라우드 서버에 등록하고 서버로부터 등록 id 를 받음
+    2 등록 id 는 메시지 전송을 담당할 애플리케이션 서버로 보내고 메시지 기다림
+    3 보낼 메시지는 어플 서버에서 클라우드 접속한 후 전송
+    4 클라우드 서버로 전송된 메시지는 대상 단말에 보내짐
+
+
+즉 애플리케이션 서버 -> 클라우드 서버 -> 단말 형태를 띄며 이 과정은 두 가지 내용만 기억하면 된다.
+
+
+    1. 애플리케이션 서버에 저장된 단말의 등록 id
+    2. 애플리케이션 서버에서 클라우드 서버로 접속하기 위한 인증 정보
+
+
+첫 번째로 푸시 메시지를 보낼 단말의 등록 id 이다. 클라우드 서버가 메시지를 보내 주어야 할 단말을 구분하는데 사용된다.
+두 번째론 클라우드 서버로 접속하기 위한 인증 정보이다.
+메시지 전송 시 아무나 접속하면 안되니 고유 API 값을 포함하여 메시지를 내보내도록 한다.
+
+
+        1 단계 - 푸시 서비스 수신을 위한 새 프로젝트
+
+푸시 서비스를 위한 프로젝트를 생성한다.
+
+
+        2 단계 - FCM 설정 페이지에서 프로젝트 생성
+
+FCM 사용을 위해 설정 페이지로 이동하여 프로젝트를 새로 만들어야 한다.
+FCM 은 여러 구글 서비스 중 하나인 Firebase 에 통합되어 있어 Firebase 개발자 콘솔 페이지에서
+새 프로젝트를 만들거나 설정한다.
+
+프로젝트를 만들었다면 FCM 으로 제공되는 푸시 서비스는 안드로이드, IOS, 웹앱 등 모두 사용할 수 있다.
+그 중 안드로이드 모양 아이콘을 클릭하여 들어가면 패키지 이름 등을 설정할 수 있다.
+패키지 이름을 설정하고 [앱 등록] 을 누르면 google-services.json 을 다운로드 받을 수 있는데
+app 폴더 안에 저장하면 된다.
+
+
+        3 단계 - 앱에서 푸시 서비스 사용을 위한 설정
+
+FCM 개발자 콘솔 페이지에 새로운 프로젝트를 만들 때 google-services.json 파일을 다운한 다음 app 폴더에 저장했다.
+이제 추가 설정이 필요하다. 그래들 파일을 열어서 다음 디펜던시를 추가한다.
+
+
+    classpath 'com.google.gms:google-services:4.3.5'
+
+
+그리고 안쪽 프로젝트의 그래들에도 디펜던시를 추가한다.
+
+
+    implementation platform('com.google.firebase:firebase-bom:26.5.0')
+
+
+추가로 파일 가장 아래엔 다음 한 줄을 작성한다.
+
+
+    apply plugin: 'com.google.gms.google-services'
+
+
+이제 [Sync Now] 를 통해 설정을 반영한다.
+
+
+        4 단계 - FCM 서비스 만들어 등록
+
+FCM 을 사용하려면 두 개의 서비스를 만들어아 한다. 먼저 MyFirebaseMessagingService 를 다음과 같이 작성한다.
+
+
+    public class MyFirebaseMessagingService extends FirebaseMessagingService {
+        private static final String TAG = "FMS";
+
+        public MyFirebaseMessagingService() {
+
+        }
+
+        @Override
+        public void onNewToken(@NonNull String token) {
+            super.onNewToken(token);
+            Log.e(TAG, "onNewToken 호출됨 : " + token);
+        }
+
+        @Override
+        public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
+            Log.d(TAG, "onMessageReceived() 호출됨.");
+        }
+    }
+
+
+FirebaseMessagingService 클래스를 상속받도록 수정했고 푸시 메시지를 전달받는 역할을 한다.
+구글 클라우드 서버에서 보내는 메시지는 이 클래스로 받을 수 있으며 onMessageReceived() 에는 단순 로그 출력만 하였다.
+
+onNewToken() 메소드는 이 앱이 Firebase 서버에 등록되었을 때 호출된다.
+파라미터로 전달받는 토큰 정보는 이 앱의 등록 id 를 의미한다.
+
+매니페스트에는 자동으로 서비스가 등록되었을 것이다.
+
+
+    <service android:name=".MyFirebaseMessagingService"
+        android:enabled="true" android:exported="true"
+        android:stopWithTask="false">
+        <intent-filter>
+            <action android:name="com.google.firebase.MESSAGING_EVENT" />
+        </intent-filter>
+    </service>
+
+
+푸시 서비스는 인터넷을 이용하니 인터넷 권한도 추가한다.
+
+
+        5 단계 - 화면 레이아웃 만들기
+
+이제 메인 액티비티 레이아웃을 구성한다.
+
+
+        6 단계 - 소스 코드에 단말 등록 기능 추가
+
+이제 메인 액티비티 자바 코드를 다음과 같이 작성한다.
+
+
+    public class PushActivity extends AppCompatActivity {
+        TextView textView;
+        TextView textView2;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_push);
+
+            textView = findViewById(R.id.textView58);
+            textView2 = findViewById(R.id.textView59);
+
+            FirebaseInstanceId.getInstance().getInstanceId().addOnSuccessListener(this,
+                    new OnSuccessListener<InstanceIdResult>() {
+                        @Override
+                        public void onSuccess(InstanceIdResult result) {
+                            String newToken = result.getToken();
+
+                            println("등록 id : " + newToken);
+                        }
+                    });
+
+            Button button = findViewById(R.id.button134);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    String instanceId = FirebaseInstanceId.getInstance().getId();
+                    println("확인된 인스턴스 id : " + instanceId);
+                }
+            });
+        }
+
+        public void println(String data) {
+            textView2.append(data + "\n");
+        }
+    }
+
+
+등록된 id 는 FirebaseInstanceId 객체의 getInstanceId() 메소드로 받아 addOnSuccessListener() 메소드로 리스너를 등록한다.
+그럼 등록 id 가 확인되면 onSuccess() 메소드가 자동 호출된다.
+화면의 버튼을 누르면 FirebaseInstanceId 객체의 getId() 메소드를 호출하여 인스턴스 id 를 확인한다.
+인스턴스 id 는 등록 id 와 달아서 등록 id 일부분만 확인할 수 있다.
+
+
+        7 단계 - 소스 코드에 메시지 수신 기능 추가
+
+서버에서 보낸 메시지는 수신 앱에서 받게 된다. 이 앱에서 푸시 메시지를 받으면 MyFirebaseMessagingService 안의
+onMessageReceived() 메소드가 호출된다. 이 메소드 호출 될 때 전달되는 RemoteMessage 객체의 정보를 확인하면
+상대방 클라우드 서버를 통해 보낸 푸시 메시지의 데이터를 확인할 수 있다.
+푸시 메시지를 보낼때 contents 를 키로 하여 사용자가 입력한 글자를 넣은 후 보낼 것이므로 메시지를 받을 때도
+contents 키로 확인할 수 있다.
+
+MyFirebaseMessagingService 로 돌아와 onMessageReceived() 메소드를 수정하고 sendToActivity() 메소드를 추가한다.
+
+
+    @Override
+    public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
+        Log.d(TAG, "onMessageReceived() 호출됨.");
+
+        String from = remoteMessage.getFrom();
+        Map<String, String> data = remoteMessage.getData();
+        String contents = data.get("contents");
+
+        Log.d(TAG, "from : " + from + ", contents : " + contents);
+        sendToActivity(getApplicationContext(), from, contents);
+    }
+
+    private void sendToActivity(Context context, String from, String contents) {
+        Intent intent = new Intent(context, PushActivity.class);
+        intent.putExtra("from", from);
+        intent.putExtra("contents", contents);
+
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|
+                Intent.FLAG_ACTIVITY_SINGLE_TOP|
+                Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        context.startActivity(intent);
+    }
+
+
+푸시 메시지를 받았을 때 RemoteMessage 객체의 getFrom() 메소드로 어디서 전송한 것인지 발신자 코드를 볼 수 있다.
+그리고 getData() 메소드로 메시지로 전송된 데이터를 확인할 수 있다. getData() 메소드 호출 시 반환된 Map 객체로
+contents 키로 꺼내면 발신 데이터를 확인할 수 있다.
+
+서비스 클래스 안의 푸시 메시지 수신했으니 이 데이터를 메인 액티비티에 전달하여 사용자에게 보여준다.
+onNewIntent() 메소드로 데이터가 전달되면 메인 액티비티에 다음 메소드를 추가하여 받는다.
+
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        println("onNewIntent 호출됨.");
+
+        if (intent != null) {
+            processIntent(intent);
+        }
+
+        super.onNewIntent(intent);
+    }
+
+    private void processIntent(Intent intent) {
+        String from = intent.getStringExtra("from");
+        if (from == null) {
+            println("from is null.");
+            return;
+        }
+
+        String contents = intent.getStringExtra("contents");
+
+        println("DATA : " + from + ", " + contents);
+        textView.setText("[" + from + "]로부터 수신한 데이터 : " + contents);
+    }
+
+
+이제 푸시 메시지 받는 앱 기능이 완성됐다.
+
+
+        8 단계 - 메시지 전송 앱 만들기
+
+이제 메시지 전송 앱을 만든다.
+sample_pushsend.xml 파일을 만들어 입력상자와 텍스트 그리고 나머지는 스크롤뷰를 차지하도록 한다.
+
+
+        9 단계 - 메시지 전송 앱의 코드 입력
+
+이제 라이브러리로 벨로이를 추가하고 메인 액티비티로 다음과 같이 작성한다.
+
+
+    public class SamplePushSendActivity extends AppCompatActivity {
+        EditText editText;
+        TextView textView;
+
+        static RequestQueue requestQueue;
+        static String regId;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_pushsend);
+
+            editText = findViewById(R.id.editTextTextPersonName22);
+            textView = findViewById(R.id.textView60);
+
+            Button button = findViewById(R.id.button135);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    String input = editText.getText().toString();
+                    send(input);
+                }
+            });
+
+            if (requestQueue == null) {
+                requestQueue = Volley.newRequestQueue(getApplicationContext());
+            }
+        }
+
+        public void send(String input) {
+
+        }
+
+        public void println(String data) {
+            textView.append(data + "\n");
+        }
+    }
+
+
+메인 액티비티에서 레이아웃에 추가한 위젯들을 찾아 변수 할당한다.
+그리고 [전송하기] 버튼을 클릭하면 메시지 전송을 위해 Volley 라이브러리로 RequestQueue 객체에 요청 객체를 만들어
+추가하면 자동으로 메시지를 전송하는 방식으로 되어 있다. 이제 send() 메소드로 전송하는 코드를 작성한다.
+
+
+    public void send(String input) {
+        JSONObject requestData = new JSONObject();
+
+        try {
+            requestData.put("priority", "high");
+
+            JSONObject dataObj = new JSONObject();
+            dataObj.put("contents", input);
+            requestData.put("data", dataObj);
+
+            JSONArray idArray = new JSONArray();
+            idArray.put(0, regId);
+            requestData.put("registration_ids", idArray);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        sendData(requestData, new SendResponseListener() {
+            @Override
+            public void onRequestCompleted() {
+                println("onRequestCompleted() 호출됨.");
+            }
+
+            @Override
+            public void onRequestStarted() {
+                println("onRequestStarted() 호출됨.");
+            }
+
+            @Override
+            public void onRequestWithError(VolleyError error) {
+                println("onRequestWithError() 호출됨.");
+            }
+        });
+    }
+
+
+메시지 전송 때는 sendData() 메소드를 호출한다. 이 메소드로 JSONObject 타입 요청 객체와 리스너를 전달한다.
+
+JSONObject 객체로 요청해야 하며 원하는 데이터를 추가할 수 있다. 여기서 contents 라는 이름으로 사용자 데이터를
+추가했고 메시지를 전송할 땐 등록 id 도 추가한다. 여기선 id 를 registration_ids 라는 이름으로 추가했다.
+
+이제 SendResponseListener 인터페이스와 sendData() 메소드를 정의한다.
+
+
+    public interface SendResponseListener {
+        public void onRequestStarted();
+        public void onRequestCompleted();
+        public void onRequestWithError(VolleyError error);
+    }
+
+
+    public void sendData(JSONObject requestData, final SendResponseListener listener) {
+        JsonObjectRequest request = new JsonObjectRequest(
+                Request.Method.POST,
+                "https://fcm.googleapis.com/fcm/send",
+                requestData,
+                new Response.Listener() {
+                    @Override
+                    public void onResponse(Object response) {
+                        listener.onRequestCompleted();
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                listener.onRequestWithError(error);
+            }
+        }) {
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> params = new HashMap<>();
+
+                return params;
+            }
+
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                Map<String, String> headers = new HashMap<>();
+                headers.put("Authorization",
+                        "key=AAAAXcTtmfY:APA91bFraCa-5mQifR4PQqLqVyVfAxDXUINMXilb9V8JOgX74_osNWyTjhOc7S7H0-YNkmTlBfS3u_6t-TLBSYJ5H2l2qklZcpx7GC_N2EfptyzvZ3l3msYFASphQ9_PhUbwYL-H3lit");
+
+                return headers;
+            }
+
+            @Override
+            public String getBodyContentType() {
+                return "application/json";
+            }
+        };
+    }
+
+
+클라우드 서버의 메시지 전송 때는 Volley 라이브러리나 okHttp 라이브러리 등을 사용할 수 있다.
+물론 다른 HTTP 라이브러리도 사용할 수 있다. 여기선 JSON 객체 요청을 위해 서버에 전송하니 JsonObjectRequest 객체를
+사용한다. 이 객체 생성엔 메소드 지정으로 POST, 클라우드 서버 요청 주소를 전달한다.
+
+
+    "https://fcm.googleapis.com/fcm/send"
+
+
+세 번째로는 요청 데이터가 들은 객체를 전달한다. 이에 대한 실패와 성공의 리스너를 등록한다.
+성공 응답은 onResponse() 메소드가 호출되므로 그 안에서 다시 리스너의 메소드를 호출하게 했다.
+
+JsonObjectResponse 객체를 만들 때 메소드를 재정의하면 요청 파라미터와 헤더를 설정할 수 있다.
+getParams() 메소드는 요청 파라미터를 설정하기 위한 메소드며, 여기엔 아무 파라미터도 설정하지 않고 비어있는 HashMap
+객체만 반환하도록 한다.
+
+헤더의 경우엔 getHeaders() 메소드를 사용해 설정하는 데 HashMap 객체에 값을 넣어 반환하면 HTTP 요청 시 헤더가 설정된다.
+헤더는 하나만 설정되었는데 Authorization 이란 키를 사용하고 있다. 그리고 값을 보면 key 에 FCM 키를 보낼 수 있다.
+
+다시 FCM 개발자 콘솔 페이지에 접속하여 왼족 메뉴 상단의 프로젝트 이름 오른쪽 설정(*) 아이콘을 클릭하여
+[프로젝트 설정] 을 통해 [프로젝트 메시징] 메뉴를 눌러 그 안에 '프로젝트 사용자 인증 정보' 란 내용을 확인한다.
+
+그 중 토큰값을 복사하여 사용하면 된다. 코드 마지막 부분에서 Volley 의 큐에 요청 객체를 추가한다.
+그럼 Volley 라이브러리에서 자동으로 요청을 전송한다. 이 앱은 인터넷을 사용하므로 메니페스트에 인터넷 권한을 추가한다.
+
+이제 Push 액티비티 먼저 실행한다. 그리고 id 값 확인 후 그 값을 복사하여 PushSend 액티비티에 붙여 넣는다.
+그리고 그리고 다른 애뮬레이터나 휴대폰으로 실행하여 메시지를 전송해본다.
+
+
+            15-4 센서 이해하기
+
+
+센서는 앱의 부가적인 사용성을 높이며 다양한 표준 센서를 지원한다.
+대표적으로 가속 센서는 다양한 기준 축을 따라 기기가 얼마의 속도로 움직였는지 측정할 수 있다.
+또 자이로코프 센서는 가속 센서보다 더 많은 축을 기준으로 시간에 따라 회전하는 정보까지 확인할 수 있게 한다.
+이 외에 다양한 센서들이 지원되는데 이 정보들은 센서 매니저란 시스템 서비스를 통해 모두 같은 방식으로 사용할 수 있다.
+다음은 안드로이드에서 지원하는 대표 센서들이다
+
+
+    가속 센서           TYPE_ACCELEROMETER          가속도 감지. 외부 충격량과 방향 감지
+    자이로스코프 센서   TYPE_GYROSCOPE               회전 정보 감지, 다양한 축을 따른 회전각 감지
+    중력 센서           TYPE_GRAVITY                축의 방향과 중력 감지
+    조도 센서           TYPE_LIGHT                  빛의 세기 감지
+    선형 가속 센서      TYPE_LINEAR_ACCELEROMETER   각 축에 따른 가속도를 감지하는 3차원 벡터
+    근접 센서           TYPE_PROXIMITY              근접한 물체와 거리 감지.
+    온도 센서           TYPE_TEMPERATURE            온도 감지
+    방향 센서           TYPE_ORIENTATION            방향각 감지
+
+
+        가속 센서와 방향 센서 이해
+
+가속 센서와 경우에는 중력 정보와 선형 가속 정보가 같이 계산되므로 가장 자주 사용되는 센서 중의 하나이다.
+가속 센서를 이해하기 위해 값을 계산할 줄 알아야 한다.
+단말을 테이블에 놓으면 가속 센서 값은 +9.81 이다. 이 값은 선형 가속 값이 0m/s^2 에서 중력 값이
+-9.81m/s^2 를 뺀 값이다. 이 값을 기준으로 가속 값을 계산하면 된다.
+예로 단말을 테이블 위에 놓은 상태로 한 방향으로 A 만큼 밀면 A+9.81m/s^2 가 된다.
+
+방향 센서의 경우엔 세 개의 값을 전달받을 수 있는데 첫 번째값은 Azimuth 라 하고 Z 축을 기준으로
+북쪽 방향과 현재 감지되는 Y 축과의 차이를 나타낸다. 그래서 범위는 0도부터 359 도 사이가 되고
+각 방위 값은 0=북, 90=동, 180=남, 270=서 가 된다.
+두 번째 값은 Pitch 라 하며 X 축을 기준으로 회전각이다.
+세 번째는 Roll 이며 Y 축을 기준으로 회전각을 나타낸다. 그래서 범위는 -90도부터 90도까지 X 축이 Z 축 방향으로 + 값이 된다.
+
+
+    SensorManager
+    Sensor
+    SensorEvent
+
+
+센서 매니저 객체는 센서를 다루기 위해 제공되는 시스템 서비스 객체이고, 센서 객체는 각 센서 정보를 포함하고 있다.
+센서로부터 정보 받을 때는 SensorEvent 객체로 전달되므로 이 객체를 처리하여 각 센서의 값을 바로바로 확인할 수 있다.
+
+이제 sample_sensor.xml 을 만들고 [센서 리스트], [첫번째 센서] 버튼을 추가하고 스크롤뷰에 텍스트뷰를 둔다.
+그리고 메인 액티비티를 다음과 같이 작성하자.
+
+
+    public class SensorActivity extends AppCompatActivity {
+        TextView textView;
+
+        SensorManager manager;
+        List<Sensor> sensors;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_sensor);
+
+            textView = findViewById(R.id.textView61);
+
+            Button button = findViewById(R.id.button136);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    getSensorList();
+                }
+            });
+        }
+
+        public void getSensorList() {
+            manager = (SensorManager) getSystemService(SENSOR_SERVICE);
+            sensors = manager.getSensorList(Sensor.TYPE_ALL);
+
+            int index = 0 ;
+            for (Sensor sensor : sensors) {
+                println("#" + index++ + " : " + sensor.getName());
+            }
+        }
+
+        public void println(String data) {
+            textView.append(data + "\n");
+        }
+    }
+
+
+첫 번째 버튼은 센서 리스트를 확인하는 코드이다.
+그리고 두 번째 버튼을 눌렀을 땐 첫 번째 센서의 값을 확인하며 화면에 출력한다.
+
+센서를 사용할 땐 센서 매니저 객체를 시스템 서비스로 참조하는 것부터 시작한다.
+getSystemService() 메소드로 SENSOR_SERVICE 상수로 센서 매니저 객체를 참조한다.
+모든 센서 리스트는 getSensorList() 메소드를 호출한다.
+
+
+    public List<Sensor> getSensorList(int type)
+
+
+센서 유형을 상수로 전달해서 호출하면 Sensor 객체를 담는 List 객체가 리턴된다.
+여기서 모든 센서 정보를 받으려면 Sensor.TYPE_ALL 상수로 전달한다.
+이제 두 번째 버튼을 클릭했을 때 첫 번째 센서의 값을 확인하는 코드를 입력한다.
+
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        ...
+
+        Button button2 = findViewById(R.id.button137);
+        button2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                registerFirstSensor();
+            }
+        });
+    }
+
+    ...
+
+    public void registerFirstSensor() {
+        manager.registerListener(
+                new SensorEventListener() {
+                    @Override
+                    public void onSensorChanged(SensorEvent event) {
+                        String output = "Sensor Timestamp : " + event.timestamp + "\n\n";
+                        for (int index = 0; index < event.values.length; index++) {
+                            output += ("Sensor Value #" + (index + 1) + " : " + event.values[index] + "\n");
+                        }
+                        println(output);
+                    }
+
+                    @Override
+                    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+                    }
+                },
+                sensors.get(0),
+                SensorManager.SENSOR_DELAY_UI);
+    }
+
+
+두 번째 버튼을 누르면 센서의 값이 변할 때마다 그값을 화면에 보여주게 된다.
+센서의 값들이 변하는 경우 SensorEvent 객체를 통해 전달받게 되는데, 이 액티비티가 SensorEventListener 를
+구현하여 사용하니 다음 두 메소드로 이벤트를 전달받을 수 있다.
+
+
+    abstract void onAccuracyChanged(Sensor sensor, int accuracy)
+    abstract void onSensorChanged(SensorEvent event)
+
+
+onAccuracyChanged() 메소드는 센서 정확도 값이 변할 때마다 호출되고, onSensorChanged() 메소드는 센서 데이터 값이 변할때마다
+호출된다. 센서 데이터값을 확인할 때는 SensorEvent 클래스의 변수값을 사용한다.
+timestamp 는 센서 값을 확인한 시간, accuracy 는 센서의 정확도, value 변수는 float 타입의 배열로 되어 있는데
+센서 종류에 따른 여러 값을 담는다. 센서 정확도는 크게 세 가지로 나눌 수 있고, 그 값이 변할 때마다
+정수 값으로 확인할 수 있다. 다음은 센서 정확도를 나타내는 상수 값인데, 정확도가 높음, 중간, 낮음 으로 구분된다.
+
+
+    SensorManager.SENSOR_STATUS_ACCURACY_HIGH
+    SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
+    SensorManager.SENSOR_STATUS_ACCURACY_LOW
+    SensorManager.SENSOR_STATUS_UNRELIABLE
+
+
+이제 앱을 실행하고 [센서 리스트] 를 누르면 값들을 확인할 수 있다.
+다른 센서를 이용 시에 인덱스 정보를 바꾸면 된다.
+
+
+            15-5 시스템 서비스 활용하기
+
+시스템 서비스는 단말 킬 때 자동으로 실행되어 백그라운드 동작을 한다.
+이런 시스템 서비스에 이미 인플레이션을 위한 시스템 서비스나 센서를 위한 시스템 서비스 등을 사용했었다.
+안드로이드에선 다양한 시스템 서비스가 제공되는데 그 중 ActivityManager, PackageManager, AlarmManager 에 알아보자.
+
+ActivityManager 는 액티비티나 서비스를 관리하는 시스템 서비스로 앱의 실행 상태를 알 수 있다.
+PackageManager 앱의 설치에 대한 정보를 알 수 있고 AlarmManager 는 일정 시간에 알림을 받을 수 있게 하는 시스템 등록 역할을 한다.
+
+sample_manager.xml 을 만들고 [프로젝트 테스트], [현재 액티비티], [앱 리스트], [액티비티 찾기], [알림 설정]
+버튼들을 추가한다. 그리고 스크롤뷰 안에 텍스트뷰 하나를 넣는다.
+그리고 메인 액티비티는 다음과 같이 작성한다.
+
+
+    public class ManagerActivity extends AppCompatActivity {
+        TextView textView;
+
+        @Override
+        protected void onCreate(@Nullable Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.sample_manager);
+
+            ...
+        }
+
+        public void getServiceList() {
+            ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            List<ActivityManager.RunningAppProcessInfo> processInfoList = manager.getRunningAppProcesses();
+
+            for (int i = 0; i < processInfoList.size(); i++) {
+                ActivityManager.RunningAppProcessInfo info = processInfoList.get(i);
+                println("#" + i + " -> " + info.pid + ", " + info.processName);
+            }
+        }
+
+        public void getCurrentActivity() {
+            ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            List<ActivityManager.RunningTaskInfo> taskList = manager.getRunningTasks(1);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ActivityManager.RunningTaskInfo info = taskList.get(0);
+                println("Running Task -> " + info.topActivity.toString());
+            }
+        }
+
+        public void getAppList() {
+            PackageManager manager = getPackageManager();
+            List<ApplicationInfo> appInfoList = manager.getInstalledApplications(PackageManager.GET_META_DATA);
+
+            for (int i = 0; i < appInfoList.size(); i++) {
+                ApplicationInfo info = appInfoList.get(i);
+                println("#" + i + " -> " + info.loadLabel(manager).toString() + ", " + info.packageName);
+            }
+        }
+
+        public void findActivity() {
+            PackageManager manager = getPackageManager();
+
+            Intent intent = new Intent(this, MainActivity.class);
+            List<ResolveInfo> activityInfoList = manager.queryIntentActivities(intent, 0);
+
+            for (int i = 0; i < activityInfoList.size(); i++) {
+                ResolveInfo info = activityInfoList.get(i);
+                println("#" + i + " -> " + info.activityInfo.applicationInfo.packageName);
+            }
+        }
+
+        public void setAlarm() {
+            AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
+            Intent intent = new Intent(this, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 101, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+            manager.set(AlarmManager.RTC, System.currentTimeMillis() + 60000, pendingIntent);
+
+        }
+
+        public void println(String data) {
+            textView.append(data + "\n");
+        }
+    }
+
+
+첫 번째 버튼을 누르면 getServiceList() 메소드가 호출된다. 이 안에 ActivityManager 객체를 참조하여
+getRunningAppProcesses() 메소드를 호출했다. 이 메소드를 호출하면 프로세스 목록을 확인할 수 있다.
+
+
+    public List<ActivityManager.RunningAppProcessInfo> getRunningAppProcesses()
+
+
+두 번째 버튼은 getCurrentActivity() 메소드를 호출하여 안에 getRunningTasks() 메소드를 호출한다.
+이 메소드로 반환되는 RunningTaskInfo 객체로 액티비티 스택에 있는 액티비티 중 최상위 정보를 확인할 수 있다.
+
+
+    public List<ActivityManager.RunningTaskInfo> getRunningTasks(int maxNum)
+
+
+세 번째 버튼을 눌렀을 때는 getAppList() 메소드가 호출된다. 이 메소드엔 getInstalledApplications() 메소드를 호출한다.
+이 메소드로 호출했을 때 반환되는 ApplicationInfo 객체를 확인하면 어떤 앱이 설치되어 있는지 확인할 수 있다.
+
+
+    public abstract List<ApplicationInfo> getInstalledApplications(int flags)
+
+
+네번째 버튼을 눌렀을 때는 findActivity() 메소드가 호출된다. 이 메소드 안에는 지정한 인텐트 객체를 이용해
+인텐트 객체로 실행할 액티비티가 있는지 확인한다.
+
+
+    public abstract List<ResolverInfo> queryIntentActivities(Intent intent, int fags)
+
+
+다섯째 버튼을 눌렀을 때는 setAlarm() 메소드가 호출된다. 이 메소드 안에 AlarmManager 객체로 알림을 설정한다.
+설정할 때는 set() 메소드를 사용할 수 있고 알람 발생 시 PendingIntent 로 설정한 인텐트가 실행된다.
+
+이제 앱을 실행하여 확인해보자.
+
+
+            15-6 네트워크 기능 활용
+
+단말에 인터넷 무선랜 연결도 확인할 수 있다.
+sample_network 을 생성하여 [연결상태 확인] 버튼을 추가하고 스크롤뷰에 텍스트뷰를 넣는다.
+그리고 메인 액티비티를 다음과 같이 작성한다.
+
+
+    public class NetworkActivity extends AppCompatActivity {
+        TextView textView;
+
+        WiFiReceiver wifiReceiver;
+
+        @Override
+        protected void onCreate(Bundle savedInstanceState) {
+            super.onCreate(savedInstanceState);
+            setContentView(R.layout.activity_main);
+
+            textView = findViewById(R.id.textView63);
+
+            Button button = findViewById(R.id.button143);
+            button.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    checkConnectivity();
+                }
+            });
+        }
+
+        public void checkConnectivity() {
+            ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo info = manager.getActiveNetworkInfo();
+            if (info != null) {
+                if (info.getType() == ConnectivityManager.TYPE_WIFI) {
+                    println("WiFi로 설정됨");
+                } else if (info.getType() == ConnectivityManager.TYPE_MOBILE) {
+                    println("일반망으로 설정됨");
+                }
+
+                println("연결 여부 : " + info.isConnected());
+            } else {
+                println("데이터통신 불가");
+            }
+
+        }
+
+        public void println(String data) {
+            textView.append(data + "\n");
+        }
+    }
+
+
+버튼을 누르면 checkConnectivity() 메소드가 호출된다.
+연결 상태 확인을 위해 ConnectivityManager 란 시스템 서비스를 사용한다.
+이 객체의 getActiveNetworkInfo() 메소드를 호출하면 NetworkInfo 객체가 반환되고 이 객체에
+인터넷 여부와 연결 방식 정보가 들어있다. getType() 으로 연결방식을 알 수 있다. 그리고 isConnected() 메소드로 연결 상태를 볼 수 있다.
+
+지금 코드에선 인터넷 연결 상태를 확인할 수 있지만 다른 방법으로 브로드 캐스트 수신자를 이용해
+연결 상태가 바뀌는 시점에 인터넷 연결 상태를 바로 확인하여 다시 연결할 수도 있다.
+예로 인터넷이 끊어지면 브로드캐스트 수신자로 인터넷이 끊어졌단 메시지를 받아 다시 연결시킬 수 있다.
+
+다음은 무선랜이 끊어졌는지 아닌지 정보를 브로드캐스트 수신자를 받아 현재 인터넷 연결 상태를 출력한다.
+
+
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        ...
+
+        wifiReceiver = new WiFiReceiver();
+    }
+
+    ...
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        unregisterReceiver(wifiReceiver);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
+        filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+        registerReceiver(wifiReceiver, filter);
+
+    }
+
+    class WiFiReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(WifiManager.WIFI_STATE_CHANGED_ACTION)) {
+                int state = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, -1);
+                if (state == WifiManager.WIFI_STATE_ENABLED) {
+                    println("WiFi enabled");
+                } else if (state == WifiManager.WIFI_STATE_DISABLED) {
+                    println("WiFi disabled");
+                }
+            } else if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
+                NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+                WifiManager manager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                String ssid = manager.getConnectionInfo().getSSID();
+
+                if (info.getState() == NetworkInfo.State.CONNECTED) {
+                    println("Connected : " + ssid);
+                } else if (info.getState() == NetworkInfo.State.DISCONNECTED) {
+                    println("Disconnected : " + ssid);
+                }
+            }
+        }
+    }
+
+
+onResume 안에 브로드캐스트 수신자를 등록하고 onPause 안에 수신자를 등록 해제하도록 한다.
+수신자가 받을 메시지를 지정하기 위해 IntentFilter 객체를 만들어 WIFI_STATE_CHANGED_ACTION 과
+NETWORK_STATE_CHANGED_ACTION 을 액션으로 추가한다. 이렇게 무선랜의 상태와 네트워크 상태를 전달할 수 있다.
+WiFiReceiver 란 이름의 새 클래스로 정의하여 인스턴스 객체를 생성하여 onReceive() 메소드로 메시지를 전달한다.
+
+이는 인터넷 연결과 무선랜 연결 권한을 알아야하므로 매니페스트에 권한을 추가한다.
+
+
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
+
+앱을 실행하여 확인해보자.
+
+
+            15-7 다중 창 지원하기
+
+다중창(Multi Window)은 단말 화면에 여러 개의 액티비티가 보이게하는 기능이다.
+시스템 메뉴 버튼으로 단말에서 실행된 액티비티를 볼 수 있는 오버뷰 화면을 만들어 다중창으로 분할하여 볼 수 있다.
+
+이 기능은 사용자가 필요에 따라 가능하지만 별도로 처리해주어야 하는 경우도 있다.
+예로 다중 창 모드로 들어갔을 때는 액티비티가 보이는 영역이 줄어 화면 레이아웃을 변경해야 할 수 있다.
+
+
+    public boolean isInMultiWindowMode()
+    public boolean isInPictureInPictureMode()
+    public void onMultiWindowModeChanged(boolean isInMultiWindowMode, Configuration newConfig)
+
+
+isInMultiWindowMode() 메소드를 호출하면 현재 다중창 모드에 들어가는 것을 볼 수 있다.
+isInPictureInPictureMode() 메소드 호출 시 PIP(큰 화면에 작은 화면)에 들어간 있는지 확인할 수 있다.
+하지만 다중 창 모드로 변경될 때마다 onMultiWindowModeChanged() 메소드로 자동호출된다
+
+sample_multiwindow.xml 레이아웃을 만들어 [다중 창 모드 확인] 과 [PIP 모드 확인] 버튼과 텍스트뷰를 배치한다.
+그리고 메인 액티비티는 다음과 같이 작성한다.
+
+
